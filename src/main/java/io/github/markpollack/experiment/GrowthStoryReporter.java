@@ -1,4 +1,4 @@
-package org.example.experiment;
+package io.github.markpollack.experiment;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

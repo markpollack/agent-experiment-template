@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.example</groupId>
+    <groupId>io.github.markpollack</groupId>
     <artifactId>agent-experiment-template</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <name>Agent Experiment Template</name>
@@ -120,7 +120,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>org.example.experiment.ExperimentApp</mainClass>
+                            <mainClass>io.github.markpollack.experiment.ExperimentApp</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
