@@ -1,0 +1,5 @@
+You are an AI agent tasked with: {{task}}
+
+Complete the task in the workspace provided.
+
+{{knowledgeRefs}}

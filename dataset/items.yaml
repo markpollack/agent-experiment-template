@@ -1,0 +1,20 @@
+# Dataset items for the experiment.
+# Each item defines a benchmark task for the agent to solve.
+#
+# Replace with your domain-specific dataset items.
+#
+# Fields:
+#   id: unique stable identifier (used for cross-run comparison)
+#   slug: human-readable name
+#   task: the developer task description
+#   source: where the source code comes from (url, local path)
+#   subdirectory: subdirectory within source (if applicable)
+#   knowledgeRefs: list of knowledge directory paths relative to knowledgeBaseDir
+
+items:
+  - id: "example-001"
+    slug: "example-project"
+    task: "Improve the project according to the experiment goals"
+    source: "https://github.com/example/example-project"
+    subdirectory: "."
+    knowledgeRefs: []
