@@ -1,4 +1,4 @@
-package io.github.markpollack.experiment;
+package com.example.experiment;
 
 import java.nio.file.Path;
 import java.time.Duration;

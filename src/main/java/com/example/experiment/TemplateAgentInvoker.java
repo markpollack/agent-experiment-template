@@ -1,4 +1,4 @@
-package io.github.markpollack.experiment;
+package com.example.experiment;
 
 import ai.tuvium.experiment.agent.AgentInvocationException;
 import ai.tuvium.experiment.agent.AgentInvoker;
