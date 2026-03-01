@@ -2,8 +2,6 @@ package io.github.markpollack.experiment;
 
 import java.util.List;
 
-import org.jspecify.annotations.Nullable;
-
 /**
  * Specification for a single experiment variant. Each variant represents a
  * different configuration of prompt, knowledge, and judges to evaluate.
@@ -17,11 +15,11 @@ import org.jspecify.annotations.Nullable;
 public record VariantSpec(
 		String name,
 		String promptFile,
-		@Nullable String knowledgeDir,
+		String knowledgeDir,
 		List<String> knowledgeFiles,
-		@Nullable java.util.Map<String, String> judgeOverrides) {
+		java.util.Map<String, String> judgeOverrides) {
 
-	public VariantSpec(String name, String promptFile, @Nullable String knowledgeDir, List<String> knowledgeFiles) {
+	public VariantSpec(String name, String promptFile, String knowledgeDir, List<String> knowledgeFiles) {
 		this(name, promptFile, knowledgeDir, knowledgeFiles, null);
 	}
 

@@ -54,7 +54,11 @@ public class JuryFactory {
 			tiers.add(new TierConfig("tier-" + tierNum, tierJury, policy));
 		}
 
-		return new CascadedJury(tiers);
+		CascadedJury.Builder cascadeBuilder = CascadedJury.builder();
+		for (TierConfig tier : tiers) {
+			cascadeBuilder.tier(tier.name(), tier.jury(), tier.policy());
+		}
+		return cascadeBuilder.build();
 	}
 
 	/**
