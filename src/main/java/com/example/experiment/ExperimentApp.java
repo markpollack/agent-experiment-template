@@ -12,11 +12,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import ai.tuvium.experiment.agent.AgentInvoker;
 import ai.tuvium.experiment.comparison.ComparisonEngine;
 import ai.tuvium.experiment.comparison.ComparisonResult;
 import ai.tuvium.experiment.comparison.DefaultComparisonEngine;
+import ai.tuvium.experiment.comparison.DiffStatus;
+import ai.tuvium.experiment.comparison.ItemDiff;
 import ai.tuvium.experiment.dataset.DatasetManager;
 import ai.tuvium.experiment.dataset.FileSystemDatasetManager;
 import ai.tuvium.experiment.result.ExperimentResult;
@@ -146,8 +149,132 @@ public class ExperimentApp {
 			previousResult = result;
 		}
 
-		reporter.generateGrowthStory();
-		logger.info("Growth story written to analysis/growth-story.md");
+		reporter.generateReport();
+		logger.info("Comparison report written to analysis/comparison-report.md");
+	}
+
+	/**
+	 * Print a human-readable results summary from the most recent run.
+	 */
+	public void printSummary() {
+		Optional<ExperimentResult> latest = resultStore.mostRecent(variantConfig.experimentName());
+		if (latest.isEmpty()) {
+			System.out.println("No results found for experiment '" + variantConfig.experimentName() + "'.");
+			System.out.println("Run a variant first: --variant control");
+			return;
+		}
+
+		ExperimentResult result = latest.get();
+		DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'").withZone(ZoneOffset.UTC);
+
+		System.out.println();
+		System.out.printf("=== Results: %s ===%n", variantConfig.experimentName());
+		System.out.printf("Run: %s%n%n", fmt.format(result.timestamp()));
+
+		// Find max slug length for alignment
+		int maxSlug = result.items().stream().mapToInt(item -> item.itemSlug().length()).max().orElse(20);
+		maxSlug = Math.max(maxSlug, 4); // "Repo" header
+
+		System.out.printf("  %-" + maxSlug + "s   Pass?   Cost        Time%n", "Repo");
+		for (var item : result.items()) {
+			String passStr = item.passed() ? "\u2713" : "\u2717";
+			String costStr = String.format("$%.4f", item.costUsd());
+			String timeStr = formatDuration(item.durationMs());
+			System.out.printf("  %-" + maxSlug + "s   %s       %-11s %s%n", item.itemSlug(), passStr, costStr,
+					timeStr);
+		}
+
+		int passed = (int) result.items().stream().filter(item -> item.passed()).count();
+		int total = result.items().size();
+		System.out.println();
+		System.out.printf("  Pass rate: %.1f%% (%d/%d)%n", result.passRate() * 100, passed, total);
+		System.out.printf("  Total cost: $%.4f%n", result.totalCostUsd());
+		System.out.printf("  Total time: %s%n", formatDuration(result.totalDurationMs()));
+		System.out.println();
+	}
+
+	/**
+	 * Print a side-by-side comparison of the two most recent runs.
+	 */
+	public void printComparison() {
+		List<ExperimentResult> results = resultStore.listByName(variantConfig.experimentName());
+		if (results.size() < 2) {
+			System.out.println("Need at least 2 runs to compare.");
+			if (results.isEmpty()) {
+				System.out.println("Run a variant first: --variant control");
+			}
+			else {
+				System.out.println("Run another variant: --variant variant-a");
+			}
+			return;
+		}
+
+		ExperimentResult baseline = results.get(results.size() - 2);
+		ExperimentResult current = results.get(results.size() - 1);
+
+		ComparisonResult comparison = comparisonEngine.compare(current, baseline);
+
+		// Determine labels from metadata or index
+		String baseLabel = baseline.metadata().getOrDefault("variant", "run-" + (results.size() - 1));
+		String curLabel = current.metadata().getOrDefault("variant", "run-" + results.size());
+
+		System.out.println();
+		System.out.printf("=== Comparison: %s \u2192 %s ===%n%n", baseLabel, curLabel);
+
+		// Find max slug length
+		int maxSlug = comparison.itemDiffs()
+			.stream()
+			.mapToInt(diff -> diff.itemId().length())
+			.max()
+			.orElse(20);
+		maxSlug = Math.max(maxSlug, 4);
+
+		System.out.printf("  %-" + maxSlug + "s   %-10s %-10s Change%n", "Repo", baseLabel, curLabel);
+		for (ItemDiff diff : comparison.itemDiffs()) {
+			String basePass = getPassStr(baseline, diff.itemId());
+			String curPass = getPassStr(current, diff.itemId());
+			String change = switch (diff.status()) {
+				case IMPROVED -> "Fixed!";
+				case REGRESSED -> "Broke!";
+				case NEW -> "New";
+				case REMOVED -> "Removed";
+				default -> "\u2014";
+			};
+			System.out.printf("  %-" + maxSlug + "s   %-10s %-10s %s%n", diff.itemId(), basePass, curPass, change);
+		}
+
+		double basePassRate = baseline.passRate() * 100;
+		double curPassRate = current.passRate() * 100;
+		double passRateDelta = curPassRate - basePassRate;
+		double costDelta = current.totalCostUsd() - baseline.totalCostUsd();
+
+		System.out.println();
+		System.out.printf("  Pass rate: %.1f%% \u2192 %.1f%% (%+.1f%%)%n", basePassRate, curPassRate, passRateDelta);
+		System.out.printf("  Cost: $%.2f \u2192 $%.2f (%+$%.2f)%n", baseline.totalCostUsd(),
+				current.totalCostUsd(), costDelta);
+		System.out.println();
+	}
+
+	private String getPassStr(ExperimentResult result, String itemId) {
+		return result.items()
+			.stream()
+			.filter(item -> item.itemId().equals(itemId))
+			.findFirst()
+			.map(item -> item.passed() ? "\u2713" : "\u2717")
+			.orElse("-");
+	}
+
+	private static String formatDuration(long ms) {
+		if (ms < 1000) {
+			return ms + "ms";
+		}
+		long seconds = ms / 1000;
+		if (seconds < 60) {
+			return seconds + "s";
+		}
+		long minutes = seconds / 60;
+		long remainSeconds = seconds % 60;
+		return minutes + "m " + remainSeconds + "s";
 	}
 
 	/**
@@ -232,6 +359,8 @@ public class ExperimentApp {
 	 *   ./mvnw compile exec:java -Dexec.args="--variant control"
 	 *   ./mvnw compile exec:java -Dexec.args="--variant control --item example-project"
 	 *   ./mvnw compile exec:java -Dexec.args="--run-all-variants"
+	 *   ./mvnw compile exec:java -Dexec.args="--summary"
+	 *   ./mvnw compile exec:java -Dexec.args="--compare"
 	 * </pre>
 	 */
 	public static void main(String[] args) {
@@ -241,6 +370,8 @@ public class ExperimentApp {
 		String targetVariant = null;
 		String targetItem = null;
 		boolean runAll = false;
+		boolean showSummary = false;
+		boolean showCompare = false;
 
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
@@ -259,6 +390,8 @@ public class ExperimentApp {
 					targetItem = args[++i];
 				}
 				case "--run-all-variants" -> runAll = true;
+				case "--summary" -> showSummary = true;
+				case "--compare" -> showCompare = true;
 				case "--project-root" -> {
 					if (i + 1 >= args.length) {
 						logger.error("--project-root requires a path");
@@ -273,8 +406,8 @@ public class ExperimentApp {
 			}
 		}
 
-		if (targetVariant == null && !runAll) {
-			logger.error("Usage: --variant <name> | --run-all-variants [--item <slug>] [--project-root <path>]");
+		if (targetVariant == null && !runAll && !showSummary && !showCompare) {
+			logger.error("Usage: --variant <name> | --run-all-variants | --summary | --compare [--item <slug>] [--project-root <path>]");
 			System.exit(1);
 		}
 
@@ -301,7 +434,13 @@ public class ExperimentApp {
 		ExperimentApp app = new ExperimentApp(config, juryFactory, resultStore, sessionStore, projectRoot);
 
 		// Dispatch
-		if (runAll) {
+		if (showSummary) {
+			app.printSummary();
+		}
+		else if (showCompare) {
+			app.printComparison();
+		}
+		else if (runAll) {
 			app.runAllVariants();
 		}
 		else {

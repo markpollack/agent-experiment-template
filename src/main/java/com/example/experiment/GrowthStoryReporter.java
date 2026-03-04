@@ -16,11 +16,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Reads experiment results and comparison data to produce a markdown growth story.
- * The growth story shows how agent performance changes across variants, providing
+ * Reads experiment results and comparison data to produce a markdown comparison report.
+ * The report shows how agent performance changes across prompt versions, providing
  * evidence for the "knowledge > prompt > model" thesis.
  *
- * <p>Output: {@code analysis/growth-story.md}</p>
+ * <p>Output: {@code analysis/comparison-report.md}</p>
  */
 public class GrowthStoryReporter {
 
@@ -39,7 +39,7 @@ public class GrowthStoryReporter {
 	 */
 	public void appendBaseline(String variantName, ExperimentSummary summary) {
 		StringBuilder sb = new StringBuilder();
-		sb.append("### ").append(variantName).append(" (Baseline)\n\n");
+		sb.append("### Prompt Version: ").append(variantName).append(" (Baseline)\n\n");
 		sb.append("| Metric | Value |\n");
 		sb.append("|--------|-------|\n");
 		sb.append(String.format("| Pass Rate | %.1f%% |\n", summary.passRate() * 100));
@@ -66,7 +66,7 @@ public class GrowthStoryReporter {
 	 */
 	public void appendComparison(String variantName, ComparisonResult comparison) {
 		StringBuilder sb = new StringBuilder();
-		sb.append("### ").append(variantName).append(" (vs previous)\n\n");
+		sb.append("### Prompt Version: ").append(variantName).append(" (vs previous)\n\n");
 
 		Map<String, ScoreComparison> scores = comparison.scoreComparisons();
 		if (!scores.isEmpty()) {
@@ -92,25 +92,25 @@ public class GrowthStoryReporter {
 	/**
 	 * Write the complete growth story to analysis/growth-story.md.
 	 */
-	public void generateGrowthStory() {
+	public void generateReport() {
 		try {
 			Files.createDirectories(analysisDir);
 
 			StringBuilder story = new StringBuilder();
-			story.append("# Growth Story\n\n");
+			story.append("# Comparison Report\n\n");
 			story.append("> Generated: ").append(Instant.now()).append("\n\n");
-			story.append("## Variant Progression\n\n");
+			story.append("## Prompt Version Progression\n\n");
 
 			for (String section : sections) {
 				story.append(section);
 			}
 
 			story.append("## Analysis\n\n");
-			story.append("_TODO: Add analysis of what drove improvements across variants._\n");
+			story.append("_TODO: Add analysis of what drove improvements across prompt versions._\n");
 
-			Path outputPath = analysisDir.resolve("growth-story.md");
+			Path outputPath = analysisDir.resolve("comparison-report.md");
 			Files.writeString(outputPath, story.toString());
-			logger.info("Growth story written to {}", outputPath);
+			logger.info("Comparison report written to {}", outputPath);
 		}
 		catch (IOException ex) {
 			throw new UncheckedIOException("Failed to write growth story", ex);
