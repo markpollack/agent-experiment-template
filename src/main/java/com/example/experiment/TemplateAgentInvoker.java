@@ -1,16 +1,15 @@
 package com.example.experiment;
 
-import ai.tuvium.experiment.agent.AgentInvocationException;
-import ai.tuvium.experiment.agent.AgentInvoker;
-import ai.tuvium.experiment.agent.InvocationContext;
-import ai.tuvium.experiment.agent.InvocationResult;
-import ai.tuvium.experiment.agent.TerminalStatus;
+import java.nio.file.Path;
 import java.util.List;
+
+import ai.tuvium.experiment.agent.InvocationContext;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Placeholder AgentInvoker implementation. Replace this with your domain-specific
+ * Single-phase AgentInvoker implementation. Replace this with your domain-specific
  * invoker that wraps AgentClient and implements the actual agent interaction.
  *
  * <p>This placeholder logs the invocation and returns a successful no-op result,
@@ -20,34 +19,32 @@ import org.slf4j.LoggerFactory;
  * <ol>
  *   <li>Rename this class to {@code {Domain}AgentInvoker}</li>
  *   <li>Inject an {@link org.springaicommunity.agents.client.AgentClient}</li>
- *   <li>Implement domain-specific pre/post processing</li>
- *   <li>Return real {@link InvocationResult} with token counts and cost</li>
+ *   <li>Override {@link #preInvoke} for domain-specific setup</li>
+ *   <li>Implement {@link #invokeAgent} with real agent interaction</li>
+ *   <li>Override {@link #postInvoke} for domain-specific measurement</li>
  * </ol>
  */
-public class TemplateAgentInvoker implements AgentInvoker {
+public class TemplateAgentInvoker extends AbstractTemplateAgentInvoker {
 
 	private static final Logger logger = LoggerFactory.getLogger(TemplateAgentInvoker.class);
 
+	public TemplateAgentInvoker() {
+		super();
+	}
+
+	public TemplateAgentInvoker(@Nullable Path knowledgeSourceDir, @Nullable List<String> knowledgeFiles) {
+		super(knowledgeSourceDir, knowledgeFiles);
+	}
+
 	@Override
-	public InvocationResult invoke(InvocationContext context) throws AgentInvocationException {
+	protected AgentResult invokeAgent(InvocationContext context) {
 		logger.info("TemplateAgentInvoker invoked for workspace: {}", context.workspacePath());
 		logger.info("Prompt length: {} chars", context.prompt().length());
 		logger.info("Model: {}", context.model());
 		logger.warn("This is a placeholder — replace with your domain-specific AgentInvoker");
 
-		long startTime = System.currentTimeMillis();
-
-		// Placeholder: return a successful no-op result
-		return InvocationResult.completed(
-				List.of(),  // phases
-				0,          // inputTokens
-				0,          // outputTokens
-				0,          // thinkingTokens
-				0.0,        // costUsd
-				System.currentTimeMillis() - startTime,
-				null,       // sessionId
-				context.metadata()
-		);
+		// Placeholder: return an empty result
+		return new AgentResult(List.of(), null);
 	}
 
 }

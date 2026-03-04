@@ -1,0 +1,17 @@
+experimentName: agent-experiment-template
+defaultModel: claude-sonnet-4-6
+timeoutMinutes: 15
+variants:
+  - name: control
+    promptFile: v0-naive.txt
+    knowledgeDir: null
+    knowledgeFiles: []
+  - name: variant-a
+    promptFile: v1-hardened.txt
+    knowledgeDir: null
+    knowledgeFiles: []
+  - name: variant-b
+    promptFile: v2-with-kb.txt
+    knowledgeDir: knowledge
+    knowledgeFiles:
+      - index.md

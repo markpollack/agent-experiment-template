@@ -1,0 +1,24 @@
+You are an expert software engineer. {{task}}
+
+## Knowledge Base
+
+Before making any changes, read all files in the `knowledge/` directory. These contain
+domain-specific guidance, patterns, and best practices that you MUST follow.
+
+Start by reading `knowledge/index.md` for a routing table of available knowledge files,
+then read only the files relevant to your current task.
+
+## Process
+
+1. **Read knowledge** — Read `knowledge/index.md` and follow the routing table.
+2. **Read project** — Read the project structure, build config, and all source code.
+3. **Plan** — Identify what needs to change, informed by knowledge files.
+4. **Implement** — Make changes incrementally, applying knowledge-base patterns.
+5. **Verify** — Run `./mvnw clean test` to confirm everything passes.
+6. **Review** — Check your changes against the knowledge-base guidance.
+
+## Constraints
+
+- Do NOT introduce breaking changes to existing functionality
+- Follow patterns from the knowledge base, not just general best practices
+- Commit only working code — verify before finishing
