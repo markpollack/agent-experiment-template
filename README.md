@@ -68,8 +68,51 @@ The experiment runner clones each repo into an isolated workspace, hands it to y
 | `--compare` | Compare the two most recent runs side by side |
 | `--project-root <path>` | Override project root directory |
 
+## Analysis Scripts
+
+After running experiments, use the Python scripts in `scripts/` to analyze results:
+
+```bash
+# 1. Load results into parquet (run from project root)
+python scripts/load_results.py --experiment my-experiment
+
+# 2. Generate variant comparison figures
+python scripts/make_figures.py
+
+# 3. Run Markov chain analysis (optional, requires markov-agent-analysis library)
+python scripts/make_markov_analysis.py
+```
+
+### Setup
+
+```bash
+# Option A: standard venv
+./scripts/setup_venv.sh /path/to/markov-agent-analysis
+
+# Option B: uv (recommended if available)
+uv venv scripts/.venv
+uv pip install -r scripts/requirements.txt
+uv pip install -e /path/to/markov-agent-analysis[all]
+```
+
+### Customize
+
+Each script has a `# CUSTOMIZE` section at the top:
+- `load_results.py`: Update `SCORE_MAP` with your judge class names
+- `make_markov_analysis.py`: Update `STATES` list and `classify_state()` with your domain's tool-call taxonomy
+- `make_figures.py`: Update `VARIANT_ORDER` and add domain-specific figures
+
+### Output
+
+| Script | Output |
+|--------|--------|
+| `load_results.py` | `data/curated/*.parquet` — 4 tables: runs, item_results, tool_uses, judge_details |
+| `make_figures.py` | `docs/figures/*.pdf + *.png` — pass rate, cost/quality, per-item breakdown |
+| `make_markov_analysis.py` | `docs/figures/*.pdf + *.png` — transition matrices, fundamental matrix, loop amplification, Sankey flows |
+
 ## Requirements
 
 - Java 17+
 - Maven (wrapper included)
 - `ANTHROPIC_API_KEY` environment variable
+- Python 3.11+ (for analysis scripts)
