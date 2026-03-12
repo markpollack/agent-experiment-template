@@ -100,7 +100,12 @@
             <version>${snakeyaml.version}</version>
         </dependency>
 
-        <!-- JSON -->
+        <!-- JSON — pin all three jackson-core artifacts to same version to avoid NoSuchMethodError -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
