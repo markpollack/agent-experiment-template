@@ -152,6 +152,10 @@ def _tool_target(tool_name: str, tool_input: dict) -> str:
         path = tool_input.get("file_path", tool_input.get("path", ""))
         parts = path.rstrip("/").split("/")
         return "/".join(parts[-2:]) if len(parts) > 1 else path
+    if tool_name == "Agent":
+        subagent_type = tool_input.get("subagent_type", "")
+        description = tool_input.get("description", "")
+        return f"{subagent_type}:{description}"[:80]
     if tool_name == "Bash":
         cmd = tool_input.get("command", "")
         return cmd[:80]

@@ -28,8 +28,15 @@ import ai.tuvium.experiment.runner.ExperimentRunner;
 import ai.tuvium.experiment.store.ActiveSession;
 import ai.tuvium.experiment.store.FileSystemResultStore;
 import ai.tuvium.experiment.store.FileSystemSessionStore;
+import ai.tuvium.experiment.store.FileSystemSweepStore;
 import ai.tuvium.experiment.store.ResultStore;
+import ai.tuvium.experiment.store.RunSessionStatus;
 import ai.tuvium.experiment.store.SessionStore;
+import ai.tuvium.experiment.store.Sweep;
+import ai.tuvium.experiment.store.SweepStatus;
+import ai.tuvium.experiment.store.SweepStore;
+import ai.tuvium.experiment.store.SweepVariantResolution;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springaicommunity.judge.exec.BuildSuccessJudge;
@@ -68,14 +75,23 @@ public class ExperimentApp {
 
 	private final GrowthStoryReporter reporter;
 
+	private final @Nullable SweepStore sweepStore;
+
 	private final Path projectRoot;
 
 	public ExperimentApp(ExperimentVariantConfig variantConfig, JuryFactory juryFactory,
 			ResultStore resultStore, SessionStore sessionStore, Path projectRoot) {
+		this(variantConfig, juryFactory, resultStore, sessionStore, null, projectRoot);
+	}
+
+	public ExperimentApp(ExperimentVariantConfig variantConfig, JuryFactory juryFactory,
+			ResultStore resultStore, SessionStore sessionStore,
+			@Nullable SweepStore sweepStore, Path projectRoot) {
 		this.variantConfig = variantConfig;
 		this.juryFactory = juryFactory;
 		this.resultStore = resultStore;
 		this.sessionStore = sessionStore;
+		this.sweepStore = sweepStore;
 		this.comparisonEngine = new DefaultComparisonEngine(resultStore);
 		this.reporter = new GrowthStoryReporter(projectRoot.resolve("analysis"));
 		this.projectRoot = projectRoot;
@@ -125,32 +141,133 @@ public class ExperimentApp {
 	 * Run all variants in sequence within a single session.
 	 */
 	public void runAllVariants() {
+		runAllVariants(null);
+	}
+
+	/**
+	 * Run all variants in sequence within a single session, optionally tracked by a
+	 * sweep.
+	 * @param sweepName sweep name, or null to skip sweep tracking
+	 */
+	public void runAllVariants(@Nullable String sweepName) {
 		List<VariantSpec> variants = variantConfig.variants();
+		String experimentName = variantConfig.experimentName();
 		String sessionName = SESSION_NAME_FORMAT.format(Instant.now());
 
 		logger.info("Running {} variants for experiment '{}' (session: {})",
-				variants.size(), variantConfig.experimentName(), sessionName);
+				variants.size(), experimentName, sessionName);
 
-		sessionStore.createSession(sessionName, variantConfig.experimentName(), Map.of());
-
-		ExperimentResult previousResult = null;
-
-		for (VariantSpec variant : variants) {
-			ExperimentResult result = runVariant(variant, sessionName);
-
-			if (previousResult != null) {
-				ComparisonResult comparison = comparisonEngine.compare(result, previousResult);
-				reporter.appendComparison(variant.name(), comparison);
-			}
-			else {
-				reporter.appendBaseline(variant.name(), comparisonEngine.summarize(result));
-			}
-
-			previousResult = result;
+		// Create sweep if requested
+		if (sweepName != null && sweepStore != null) {
+			List<String> variantNames = variants.stream().map(VariantSpec::name).toList();
+			sweepStore.createSweep(sweepName, experimentName, variantNames, Map.of());
+			logger.info("Created sweep '{}' with expected variants: {}", sweepName, variantNames);
 		}
 
-		reporter.generateReport();
-		logger.info("Comparison report written to analysis/comparison-report.md");
+		sessionStore.createSession(sessionName, experimentName, Map.of());
+
+		RunSessionStatus finalStatus = RunSessionStatus.COMPLETED;
+		SweepStatus sweepStatus = SweepStatus.COMPLETED;
+		try {
+			ExperimentResult previousResult = null;
+
+			for (VariantSpec variant : variants) {
+				ExperimentResult result = runVariant(variant, sessionName);
+
+				if (previousResult != null) {
+					ComparisonResult comparison = comparisonEngine.compare(result, previousResult);
+					reporter.appendComparison(variant.name(), comparison);
+				}
+				else {
+					reporter.appendBaseline(variant.name(), comparisonEngine.summarize(result));
+				}
+
+				previousResult = result;
+			}
+
+			reporter.generateReport();
+			logger.info("Comparison report written to analysis/comparison-report.md");
+		}
+		catch (Exception ex) {
+			finalStatus = RunSessionStatus.FAILED;
+			sweepStatus = SweepStatus.FAILED;
+			throw ex;
+		}
+		finally {
+			sessionStore.finalizeSession(sessionName, experimentName, finalStatus);
+
+			// Add session to sweep and finalize
+			if (sweepName != null && sweepStore != null) {
+				String gitCommit = resolveGitCommit();
+				sweepStore.addSession(sweepName, experimentName, sessionName, gitCommit);
+				sweepStore.finalizeSweep(sweepName, experimentName, sweepStatus);
+				logger.info("Finalized sweep '{}' with status {}", sweepName, sweepStatus);
+			}
+		}
+	}
+
+	/**
+	 * Print sweep status for the given sweep name.
+	 */
+	public void printSweepStatus(String sweepName) {
+		if (sweepStore == null) {
+			System.out.println("Sweep store not configured.");
+			return;
+		}
+
+		Optional<Sweep> maybeSweep = sweepStore.loadSweep(variantConfig.experimentName(), sweepName);
+		if (maybeSweep.isEmpty()) {
+			System.out.println("No sweep '" + sweepName + "' found for experiment '"
+					+ variantConfig.experimentName() + "'.");
+			return;
+		}
+
+		Sweep sweep = maybeSweep.get();
+		List<String> missing = sweep.missingVariants();
+		int resolved = sweep.expectedVariants().size() - missing.size();
+
+		System.out.println();
+		System.out.printf("Sweep: %s%n", sweep.sweepName());
+		System.out.printf("Status: %s (%d/%d variants resolved)%n",
+				sweep.status(), resolved, sweep.expectedVariants().size());
+
+		if (!missing.isEmpty()) {
+			System.out.printf("Missing: %s%n", String.join(", ", missing));
+		}
+
+		List<String> sessions = sweep.resolutions()
+			.stream()
+			.filter(SweepVariantResolution::isResolved)
+			.map(SweepVariantResolution::sessionName)
+			.toList();
+		if (!sessions.isEmpty()) {
+			System.out.printf("Sessions: %s%n", String.join(", ", sessions));
+		}
+
+		if (sweep.hasVersionMismatch()) {
+			System.out.println("Warning: variant results were produced from different git commits");
+		}
+
+		System.out.println();
+	}
+
+	/**
+	 * Resolve the current git commit hash, or null if not in a git repo.
+	 */
+	private @Nullable String resolveGitCommit() {
+		try {
+			Process process = new ProcessBuilder("git", "rev-parse", "HEAD")
+				.directory(projectRoot.toFile())
+				.redirectErrorStream(true)
+				.start();
+			String output = new String(process.getInputStream().readAllBytes()).trim();
+			int exitCode = process.waitFor();
+			return exitCode == 0 ? output : null;
+		}
+		catch (IOException | InterruptedException ex) {
+			logger.debug("Could not resolve git commit: {}", ex.getMessage());
+			return null;
+		}
 	}
 
 	/**
@@ -359,6 +476,8 @@ public class ExperimentApp {
 	 *   ./mvnw compile exec:java -Dexec.args="--variant control"
 	 *   ./mvnw compile exec:java -Dexec.args="--variant control --item example-project"
 	 *   ./mvnw compile exec:java -Dexec.args="--run-all-variants"
+	 *   ./mvnw compile exec:java -Dexec.args="--run-all-variants --sweep my-sweep"
+	 *   ./mvnw compile exec:java -Dexec.args="--sweep-status my-sweep"
 	 *   ./mvnw compile exec:java -Dexec.args="--summary"
 	 *   ./mvnw compile exec:java -Dexec.args="--compare"
 	 * </pre>
@@ -369,6 +488,8 @@ public class ExperimentApp {
 		// Parse CLI arguments
 		String targetVariant = null;
 		String targetItem = null;
+		String sweepName = null;
+		String sweepStatusName = null;
 		boolean runAll = false;
 		boolean showSummary = false;
 		boolean showCompare = false;
@@ -389,6 +510,20 @@ public class ExperimentApp {
 					}
 					targetItem = args[++i];
 				}
+				case "--sweep" -> {
+					if (i + 1 >= args.length) {
+						logger.error("--sweep requires a sweep name");
+						System.exit(1);
+					}
+					sweepName = args[++i];
+				}
+				case "--sweep-status" -> {
+					if (i + 1 >= args.length) {
+						logger.error("--sweep-status requires a sweep name");
+						System.exit(1);
+					}
+					sweepStatusName = args[++i];
+				}
 				case "--run-all-variants" -> runAll = true;
 				case "--summary" -> showSummary = true;
 				case "--compare" -> showCompare = true;
@@ -406,8 +541,18 @@ public class ExperimentApp {
 			}
 		}
 
-		if (targetVariant == null && !runAll && !showSummary && !showCompare) {
-			logger.error("Usage: --variant <name> | --run-all-variants | --summary | --compare [--item <slug>] [--project-root <path>]");
+		// Validate flag combinations
+		if (sweepName != null && !runAll) {
+			logger.error("--sweep can only be used with --run-all-variants");
+			System.exit(1);
+		}
+		if (sweepName != null && targetVariant != null) {
+			logger.error("--sweep cannot be used with --variant");
+			System.exit(1);
+		}
+
+		if (targetVariant == null && !runAll && !showSummary && !showCompare && sweepStatusName == null) {
+			logger.error("Usage: --variant <name> | --run-all-variants [--sweep <name>] | --sweep-status <name> | --summary | --compare [--item <slug>] [--project-root <path>]");
 			System.exit(1);
 		}
 
@@ -431,17 +576,25 @@ public class ExperimentApp {
 		SessionStore sessionStore = new FileSystemSessionStore(resultsDir);
 		JuryFactory juryFactory = buildJuryFactory(projectRoot);
 
-		ExperimentApp app = new ExperimentApp(config, juryFactory, resultStore, sessionStore, projectRoot);
+		// Wire SweepStore only when sweep features are requested
+		SweepStore sweepStore = (sweepName != null || sweepStatusName != null)
+				? new FileSystemSweepStore(resultsDir, sessionStore) : null;
+
+		ExperimentApp app = new ExperimentApp(config, juryFactory, resultStore, sessionStore,
+				sweepStore, projectRoot);
 
 		// Dispatch
-		if (showSummary) {
+		if (sweepStatusName != null) {
+			app.printSweepStatus(sweepStatusName);
+		}
+		else if (showSummary) {
 			app.printSummary();
 		}
 		else if (showCompare) {
 			app.printComparison();
 		}
 		else if (runAll) {
-			app.runAllVariants();
+			app.runAllVariants(sweepName);
 		}
 		else {
 			String variantName = targetVariant;
@@ -454,7 +607,17 @@ public class ExperimentApp {
 
 			String sessionName = SESSION_NAME_FORMAT.format(Instant.now());
 			sessionStore.createSession(sessionName, config.experimentName(), Map.of());
-			app.runVariant(variant, sessionName);
+			RunSessionStatus finalStatus = RunSessionStatus.COMPLETED;
+			try {
+				app.runVariant(variant, sessionName);
+			}
+			catch (Exception ex) {
+				finalStatus = RunSessionStatus.FAILED;
+				throw ex;
+			}
+			finally {
+				sessionStore.finalizeSession(sessionName, config.experimentName(), finalStatus);
+			}
 		}
 	}
 
