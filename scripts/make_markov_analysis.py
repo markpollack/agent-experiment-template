@@ -2,10 +2,19 @@
 """
 Markov chain analysis — template wrapper.
 
-CUSTOMIZE:
-  1. Update STATES with your domain's tool-call state taxonomy
-  2. Update classify_state() with your domain-specific logic
-  3. Update CLUSTER_DEFINITIONS, DELTA_PAIRS, NOTE_MAP, COLORS, VARIANT_ORDER
+Starting point: 9-state taxonomy from the tuvium-code-coverage-v2 experiment
+(Java/Maven/Spring test-writing agents). This is a proven classifier for
+code-generation and test-writing workflows. Adapt for your domain.
+
+CUSTOMIZE for a new domain:
+  1. Update STATES — add/remove/rename states to match your workflow
+  2. Update classify_state() — map your tool calls to those states
+     - Run MARKOV_DISCOVERY=true first to see raw tool:target frequencies
+     - Keep the Bash subclassification pattern; just change the keywords
+  3. Update CLUSTER_DEFINITIONS — define which state groups represent
+     friction (e.g., FIX_LOOP), forward progress (e.g., PRODUCTIVE), etc.
+  4. Update VARIANT_ORDER, DELTA_PAIRS, NOTE_MAP to match your variants
+  5. Update COLORS (optional — defaults are fine for exploration)
 
 Bootstrap procedure (do this BEFORE finalizing the taxonomy):
   1. Run one control variant (N=1) to generate tool_uses.parquet
@@ -14,6 +23,20 @@ Bootstrap procedure (do this BEFORE finalizing the taxonomy):
      Then inspect: SELECT state, count(*) FROM tool_uses GROUP BY 1 ORDER BY 2 DESC
   3. Cluster the top-N patterns into named states
   4. Write classify_state() based on real data, then re-run normally
+
+State taxonomy rationale (code-coverage-v2):
+  EXPLORE     — targeted file access via Read/Glob (agent knows where to look)
+  SHELL       — unstructured shell searching via Bash find/ls/grep (agent is casting a net)
+  READ_KB     — reading knowledge base files (knowledge/ dir)
+  READ_SKILL  — invoking a modular knowledge skill (Skill tool)
+  JAR_INSPECT — spelunking Maven cache for class/import discovery (jar tf, javap)
+  WRITE       — writing output files for the first time (forward progress)
+  BUILD       — running the build/test pipeline (./mvnw, ./gradlew)
+  VERIFY      — reading back results to confirm success (JaCoCo, test report)
+  FIX         — editing output files after a failure (rework)
+
+  SEARCH cluster = SHELL + JAR_INSPECT (all unstructured searching)
+  FIX_LOOP cluster = FIX + BUILD (rework cycle)
 
 Requires markov-agent-analysis library:
     uv pip install -e ~/tuvium/projects/markov-agent-analysis/[all]
@@ -31,6 +54,8 @@ import matplotlib
 matplotlib.use("Agg")
 
 from markov_agent_analysis import MarkovAnalysisPipeline
+from markov_agent_analysis.transitions import apply_classify, build_transition_counts, normalize_to_probability_matrix
+from markov_agent_analysis.figures import make_single_transition_matrix
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -56,29 +81,37 @@ if DISCOVERY_MODE:
 # CUSTOMIZE: State taxonomy for your domain
 # ---------------------------------------------------------------------------
 
-# Replace with your domain's semantic state names.
-# These are the labels your classify_state() function returns.
-# Common starting point — adjust after inspecting discovery-mode output.
+# 9-state taxonomy from code-coverage-v2 (Java/Maven test-writing).
+# For a different domain, replace these with your workflow's semantic phases.
+# Start with 5-6 states; add more only after inspecting discovery-mode output.
 STATES = [
-    "EXPLORE",    # reading/searching source files, directories, discovery
-    "READ_KB",    # reading knowledge base files
-    "WRITE",      # writing output files (first time)
-    "BUILD",      # running build/test/verify commands
-    "VERIFY",     # reading back output, checking results
-    "FIX",        # editing/rewriting output after an error
+    "EXPLORE",      # structured file access: Read tool, Glob, Agent subagent
+    "SHELL",        # shell-based exploration: find, ls, grep, cat, tree — casting a net
+    "READ_KB",      # reading knowledge base files (knowledge/ dir)
+    "READ_SKILL",   # invoking a SkillsJars skill (Skill tool call)
+    "JAR_INSPECT",  # jar tf/xf, javap — agent spelunking .m2 to find imports
+    "WRITE",        # writing output files (first time — forward progress)
+    "BUILD",        # ./mvnw clean test jacoco:report — actual execution
+    "VERIFY",       # reading back results to confirm coverage/success
+    "FIX",          # editing output files after a failure — rework
 ]
 
-# CUSTOMIZE: per-state colors (optional — defaults to tab10 palette)
+# CUSTOMIZE: per-state colors for charts
+# These colors were chosen for code-coverage-v2 to group related states visually:
+# blues = exploration family, greens = knowledge family, purples/yellows = execution
 COLORS = {
-    # "EXPLORE": "#4C72B0",
-    # "READ_KB": "#55A868",
-    # "WRITE":   "#C44E52",
-    # "BUILD":   "#8172B2",
-    # "VERIFY":  "#CCB974",
-    # "FIX":     "#DD8452",
+    "EXPLORE":     "#4C72B0",
+    "SHELL":       "#9ecae1",   # lighter blue — related to EXPLORE but unstructured
+    "READ_KB":     "#55A868",
+    "READ_SKILL":  "#29a8ab",
+    "JAR_INSPECT": "#937860",
+    "WRITE":       "#2ca02c",
+    "BUILD":       "#8172B2",
+    "VERIFY":      "#CCB974",
+    "FIX":         "#C44E52",
 }
 
-# CUSTOMIZE: display order for variant names in charts
+# CUSTOMIZE: display order for variants in all charts
 VARIANT_ORDER = [
     "control",
     "variant-a",
@@ -87,29 +120,30 @@ VARIANT_ORDER = [
     "variant-d",
 ]
 
-# CUSTOMIZE: cluster definitions for cluster% computation
-# Maps cluster label → list of state names in that cluster
-# High FIX_LOOP % = agent thrashing; high PRODUCTIVE % = forward progress
+# CUSTOMIZE: cluster definitions
+# FIX_LOOP: rework cluster — agent retrying after failure
+# PRODUCTIVE: forward-progress cluster — writing for the first time
+# SEARCH: all unstructured searching (efficiency tax) — key metric for knowledge interventions
+# JAR_INSPECT: framework friction specifically addressable by KB injection
 CLUSTER_DEFINITIONS = {
-    "FIX_LOOP":   ["FIX", "VERIFY"],     # rework cluster — identifies thrashing
-    "PRODUCTIVE": ["WRITE", "BUILD"],    # forward-progress cluster
-    # "JAR_INSPECT": ["EXPLORE"],        # example: narrow to JAR-reading substate
+    "FIX_LOOP":   ["FIX", "BUILD"],          # rework cycle: edit → rebuild
+    "PRODUCTIVE": ["WRITE"],                  # forward progress: writing output
+    "SEARCH":     ["SHELL", "JAR_INSPECT"],  # all unstructured searching
+    "JAR_INSPECT": ["JAR_INSPECT"],          # framework friction: addressable by KB
 }
 
-# CUSTOMIZE: variant pairs for intervention delta heatmaps
-# Format: (variant_a, variant_b, "label") — heatmap shows P_b - P_a
+# CUSTOMIZE: variant pairs for ΔP delta heatmaps
+# Each entry shows how the transition matrix changed from A to B
 DELTA_PAIRS = [
-    ("control", "variant-a", "Effect of hardened prompt"),
-    # ("variant-a", "variant-b", "Effect of KB"),
-    # ("variant-b", "variant-c", "Effect of full KB"),
-    # ("variant-a", "variant-d", "Effect of forge plan/act"),
+    ("control", "variant-a", "Effect of intervention A"),
+    # ("variant-a", "variant-b", "Effect of intervention B"),
 ]
 
 # CUSTOMIZE: human-readable labels for each variant (used in findings.md)
 NOTE_MAP = {
-    "control":   "Minimal instructions — baseline",
+    "control":   "Minimal prompt — baseline",
     # "variant-a": "Hardened prompt",
-    # "variant-b": "Hardened prompt + KB",
+    # "variant-b": "Hardened + KB",
 }
 
 # ---------------------------------------------------------------------------
@@ -125,6 +159,11 @@ def classify_state(tool_name: str, target: str) -> str | None:
 
     In DISCOVERY_MODE, returns raw "tool:target" so you can inspect
     frequency counts and define the real taxonomy from actual data.
+
+    This classifier is tuned for Java/Maven/Spring test-writing agents.
+    CUSTOMIZE: adjust the Bash subclassification keywords for your domain.
+    The overall structure (exclude meta-tools, handle Write/Edit/Read/Glob/Bash)
+    applies to any Claude Code agent — only the Bash keywords change.
     """
     tool_lower = tool_name.lower() if tool_name else ""
     target_lower = target.lower() if target else ""
@@ -138,17 +177,22 @@ def classify_state(tool_name: str, target: str) -> str | None:
                       "exitplanmode", "enterplanmode"):
         return None
 
-    # Agent subagent calls — Explore subagents = EXPLORE, others = EXPLORE
+    # Skill tool — agent invoking a modular knowledge skill
+    if tool_lower == "skill":
+        return "READ_SKILL"
+
+    # Agent subagent calls — counts as exploration overhead
     if tool_lower == "agent":
         return "EXPLORE"
 
     # Writing output files (first production)
     # CUSTOMIZE: narrow by file extension to distinguish productive writes
+    # e.g., if target_lower.endswith(".java"): return "WRITE" (else EXPLORE for config)
     if tool_lower in ("write", "writefile", "notebookedit"):
         return "WRITE"
 
     # Editing output files = rework (FIX)
-    # CUSTOMIZE: scope to output files only; exclude editing planning docs
+    # CUSTOMIZE: scope to output files only; exclude editing planning docs if needed
     if tool_lower in ("edit", "str_replace_editor", "str_replace_based_edit"):
         return "FIX"
 
@@ -159,18 +203,57 @@ def classify_state(tool_name: str, target: str) -> str | None:
         # CUSTOMIZE: reading back your own output = VERIFY, reading source = EXPLORE
         return "EXPLORE"
 
-    # Discovery / search
+    # Targeted search — agent knows what it's looking for
     if tool_lower in ("glob", "grep"):
         return "EXPLORE"
 
-    # Bash commands
+    # Bash commands — subclassify by what the command is actually doing
+    # This is the most domain-specific section. Adjust keywords for your toolchain.
     if tool_lower == "bash":
-        # CUSTOMIZE: distinguish build/test commands from verification/discovery
-        # Example: if "mvn" in target_lower or "gradle" in target_lower: return "BUILD"
-        # Example: if "ls " in target_lower or "find " in target_lower: return "EXPLORE"
-        return "BUILD"
+
+        # JAR inspection: agent reading .m2 jars to discover classes/imports
+        # Signal: agent doesn't know test framework imports — addressable by KB
+        # CUSTOMIZE: remove this block for non-Java domains
+        if any(x in target_lower for x in (
+            "jar tf", "jar -tf", "jar --list",
+            "jar xf", "jar -xf",
+            "javap ",
+        )):
+            return "JAR_INSPECT"
+
+        # Build/test execution: the real BUILD state
+        # CUSTOMIZE: replace with your build tool (pytest, cargo test, go test, etc.)
+        if any(x in target_lower for x in (
+            "mvnw clean", "mvnw test", "mvnw verify", "mvnw package",
+            "gradlew test", "gradlew build", "gradlew check",
+            "jacoco:report", "mvn test", "mvn verify",
+        )):
+            return "BUILD"
+
+        # Results verification: reading back output to confirm success
+        # CUSTOMIZE: replace with your output format (coverage.xml, test_results/, etc.)
+        if any(x in target_lower for x in (
+            "jacoco", "index.html", "coverage", "surefire-reports",
+        )):
+            return "VERIFY"
+
+        # Shell-based exploration: agent searching rather than reading directly
+        # Distinct from EXPLORE (Read tool) — agent doesn't know exactly where to look
+        if any(x in target_lower for x in (
+            "ls ", "find ", "tree ", "cat ", "head ", "tail ", "wc ",
+            "grep ", "echo ", "pwd", "dependency:tree", "dep:tree",
+        )):
+            return "SHELL"
+
+        # Scaffolding (mkdir, cp, mv) — exclude: not semantically interesting
+        if any(x in target_lower for x in ("mkdir", "cp ", "mv ", "chmod", "touch ")):
+            return None
+
+        # Default bash (sed, awk, curl, etc.) → treat as shell exploration
+        return "SHELL"
 
     return "EXPLORE"  # default
+
 
 # ---------------------------------------------------------------------------
 # Data loading
@@ -219,6 +302,78 @@ if __name__ == "__main__":
         enable_sankey=True,
     )
     pipeline.run(tools, items)
+
+    # Generate cost/steps bar chart — the "money shot"
+    print("\nGenerating cost vs steps bar chart...")
+    import matplotlib.pyplot as plt
+    import matplotlib
+    matplotlib.use("Agg")
+    import duckdb
+    con = duckdb.connect()
+    cost_df = con.execute(f"""
+        SELECT variant,
+               round(avg(cost_usd), 4)      AS mean_cost,
+               round(stddev(cost_usd), 4)   AS std_cost,
+               round(avg(phase_count), 1)   AS mean_steps
+        FROM '{DATA_DIR}/item_results.parquet'
+        GROUP BY variant ORDER BY variant
+    """).df()
+    con.close()
+    ordered = [v for v in VARIANT_ORDER if v in cost_df["variant"].values]
+    cost_df = cost_df.set_index("variant").loc[ordered].reset_index()
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    plt.rcParams.update({"font.family": "serif", "font.size": 10})
+
+    bar_colors = ["#C44E52" if v == VARIANT_ORDER[-1] else "#4C72B0"
+                  for v in cost_df["variant"]]
+
+    ax = axes[0]
+    bars = ax.bar(range(len(cost_df)), cost_df["mean_cost"], color=bar_colors,
+                  yerr=cost_df["std_cost"], capsize=4, edgecolor="white", linewidth=0.5)
+    ax.set_xticks(range(len(cost_df)))
+    ax.set_xticklabels(cost_df["variant"], rotation=35, ha="right", fontsize=9)
+    ax.set_ylabel("Mean cost per item (USD)", fontsize=11)
+    ax.set_title("Cost per variant", fontsize=12, fontweight="bold")
+    ax.yaxis.grid(True, alpha=0.3)
+    ax.set_axisbelow(True)
+    for bar, cost in zip(bars, cost_df["mean_cost"]):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.02,
+                f"${cost:.2f}", ha="center", va="bottom", fontsize=8)
+
+    ax = axes[1]
+    bars2 = ax.bar(range(len(cost_df)), cost_df["mean_steps"], color=bar_colors,
+                   edgecolor="white", linewidth=0.5)
+    ax.set_xticks(range(len(cost_df)))
+    ax.set_xticklabels(cost_df["variant"], rotation=35, ha="right", fontsize=9)
+    ax.set_ylabel("Mean steps per item", fontsize=11)
+    ax.set_title("Steps per variant", fontsize=12, fontweight="bold")
+    ax.yaxis.grid(True, alpha=0.3)
+    ax.set_axisbelow(True)
+    for bar, steps in zip(bars2, cost_df["mean_steps"]):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5,
+                f"{steps:.0f}", ha="center", va="bottom", fontsize=8)
+
+    fig.suptitle("Agent efficiency by variant — cost and step count", fontsize=13)
+    fig.tight_layout()
+    out = OUTPUT_DIR / "cost-steps-comparison"
+    fig.savefig(str(out) + ".png", dpi=150, bbox_inches="tight")
+    fig.savefig(str(out) + ".pdf", bbox_inches="tight")
+    plt.close(fig)
+    print(f"  {out}.png")
+
+    # Generate individual per-variant heatmaps (large, readable — for docs/reports)
+    print("\nGenerating individual variant heatmaps...")
+    classified = apply_classify(tools, classify_state)
+    count_matrices = build_transition_counts(classified, STATES)
+    for variant in VARIANT_ORDER:
+        if variant not in count_matrices:
+            continue
+        P = normalize_to_probability_matrix(count_matrices[variant])
+        safe_name = variant.replace("+", "-").replace(" ", "_")
+        out_path = OUTPUT_DIR / f"heatmap-{safe_name}"
+        make_single_transition_matrix(P, STATES, variant, out_path)
+        print(f"  {out_path}.png")
 
     elapsed = time.time() - t0
     print(f"\nDone in {elapsed:.1f}s")
