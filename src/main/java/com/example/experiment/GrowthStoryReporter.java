@@ -9,9 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import ai.tuvium.experiment.comparison.ComparisonResult;
-import ai.tuvium.experiment.comparison.ExperimentSummary;
-import ai.tuvium.experiment.comparison.ScoreComparison;
+import io.github.markpollack.experiment.comparison.ComparisonResult;
+import io.github.markpollack.experiment.comparison.ExperimentSummary;
+import io.github.markpollack.experiment.comparison.ScoreComparison;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

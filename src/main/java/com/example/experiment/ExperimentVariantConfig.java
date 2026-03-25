@@ -2,7 +2,7 @@ package com.example.experiment;
 
 import java.util.List;
 
-import ai.tuvium.experiment.dataset.DatasetManager;
+import io.github.markpollack.experiment.dataset.DatasetManager;
 import org.jspecify.annotations.Nullable;
 
 /**

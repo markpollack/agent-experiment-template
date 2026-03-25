@@ -2,7 +2,7 @@ package com.example.experiment;
 
 import java.util.List;
 
-import ai.tuvium.experiment.agent.InvocationContext;
+import io.github.markpollack.experiment.agent.InvocationContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
