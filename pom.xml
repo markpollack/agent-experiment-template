@@ -71,19 +71,19 @@
         <dependency>
             <groupId>io.github.markpollack</groupId>
             <artifactId>journal-core</artifactId>
-            <version>1.0.1-SNAPSHOT</version>
+            <version>1.0.1</version>
         </dependency>
         <dependency>
             <groupId>io.github.markpollack</groupId>
             <artifactId>claude-code-capture</artifactId>
-            <version>1.0.1-SNAPSHOT</version>
+            <version>1.0.1</version>
         </dependency>
 
         <!-- Workflow journal — bridges agent-workflow DSL with agent-journal Run -->
         <dependency>
             <groupId>io.github.markpollack</groupId>
             <artifactId>workflow-journal</artifactId>
-            <version>0.6.0-SNAPSHOT</version>
+            <version>0.6.0</version>
         </dependency>
 
         <!-- AST parsing for judges -->
