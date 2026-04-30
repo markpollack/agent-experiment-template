@@ -11,7 +11,7 @@
     <description>Standard agent experiment project with pre-wired experiment loop</description>
 
     <properties>
-        <java.version>17</java.version>
+        <java.version>21</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -19,7 +19,7 @@
         <!-- Dependency versions -->
         <experiment-core.version>0.1.0-SNAPSHOT</experiment-core.version>
         <agent-judge.version>0.9.1-SNAPSHOT</agent-judge.version>
-        <agent-client.version>0.10.0-SNAPSHOT</agent-client.version>
+        <agent-client.version>0.15.0</agent-client.version>
         <jackson.version>2.17.2</jackson.version>
         <snakeyaml.version>2.2</snakeyaml.version>
         <slf4j.version>2.0.13</slf4j.version>
@@ -51,12 +51,12 @@
         <!-- Agent client -->
         <dependency>
             <groupId>org.springaicommunity.agents</groupId>
-            <artifactId>spring-ai-agent-client</artifactId>
+            <artifactId>agent-client-core</artifactId>
             <version>${agent-client.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springaicommunity.agents</groupId>
-            <artifactId>spring-ai-claude-agent</artifactId>
+            <artifactId>agent-starter-claude</artifactId>
             <version>${agent-client.version}</version>
         </dependency>
 
@@ -71,12 +71,19 @@
         <dependency>
             <groupId>io.github.markpollack</groupId>
             <artifactId>journal-core</artifactId>
-            <version>0.1.0-SNAPSHOT</version>
+            <version>1.0.1-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>io.github.markpollack</groupId>
             <artifactId>claude-code-capture</artifactId>
-            <version>0.1.0-SNAPSHOT</version>
+            <version>1.0.1-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Workflow journal — bridges agent-workflow DSL with agent-journal Run -->
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>workflow-journal</artifactId>
+            <version>0.6.0-SNAPSHOT</version>
         </dependency>
 
         <!-- AST parsing for judges -->
@@ -164,8 +171,7 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <release>${java.version}</release>
                 </configuration>
             </plugin>
             <plugin>
