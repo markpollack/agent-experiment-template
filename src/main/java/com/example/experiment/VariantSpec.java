@@ -13,6 +13,7 @@ import org.jspecify.annotations.Nullable;
  * @param actPromptFile filename in prompts/ for act phase (null for single-phase)
  * @param knowledgeDir relative path to knowledge directory (null for no knowledge)
  * @param knowledgeFiles specific knowledge files to include
+ * @param orchestration orchestration mode: null/"direct" for legacy, "workflow" for agent-workflow
  * @param judgeOverrides judge configuration overrides for this variant
  */
 public record VariantSpec(
@@ -21,20 +22,26 @@ public record VariantSpec(
 		@Nullable String actPromptFile,
 		String knowledgeDir,
 		List<String> knowledgeFiles,
+		@Nullable String orchestration,
 		java.util.Map<String, String> judgeOverrides) {
 
 	public VariantSpec(String name, String promptFile, String knowledgeDir, List<String> knowledgeFiles) {
-		this(name, promptFile, null, knowledgeDir, knowledgeFiles, null);
+		this(name, promptFile, null, knowledgeDir, knowledgeFiles, null, null);
 	}
 
 	public VariantSpec(String name, String promptFile, @Nullable String actPromptFile,
 			String knowledgeDir, List<String> knowledgeFiles) {
-		this(name, promptFile, actPromptFile, knowledgeDir, knowledgeFiles, null);
+		this(name, promptFile, actPromptFile, knowledgeDir, knowledgeFiles, null, null);
 	}
 
 	/** Whether this variant uses a two-phase (explore + act) invocation pattern. */
 	public boolean isTwoPhase() {
 		return actPromptFile != null;
+	}
+
+	/** Whether this variant uses agent-workflow orchestration. */
+	public boolean isWorkflow() {
+		return "workflow".equals(orchestration);
 	}
 
 }

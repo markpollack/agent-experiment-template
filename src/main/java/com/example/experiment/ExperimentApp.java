@@ -403,6 +403,12 @@ public class ExperimentApp {
 			String actPrompt = loadPromptFile(variant.actPromptFile());
 			return new TwoPhaseTemplateAgentInvoker(actPrompt);
 		}
+		if (variant.isWorkflow()) {
+			Path knowledgeDir = variant.knowledgeDir() != null
+					? projectRoot.resolve(variant.knowledgeDir()) : null;
+			List<String> knowledgeFiles = variant.knowledgeFiles();
+			return new WorkflowAgentInvoker(knowledgeDir, knowledgeFiles);
+		}
 		return new TemplateAgentInvoker();
 	}
 
@@ -450,7 +456,8 @@ public class ExperimentApp {
 			List<String> knowledgeFiles = rv.get("knowledgeFiles") != null
 					? (List<String>) rv.get("knowledgeFiles")
 					: List.of();
-			variants.add(new VariantSpec(name, promptFile, actPromptFile, knowledgeDir, knowledgeFiles));
+			String orchestration = (String) rv.get("orchestration");
+			variants.add(new VariantSpec(name, promptFile, actPromptFile, knowledgeDir, knowledgeFiles, orchestration, null));
 		}
 
 		return new ExperimentVariantConfig(
