@@ -44,6 +44,25 @@ Standard template for agent experiments with pre-wired experiment loop. Used by 
 ./mvnw compile exec:java -Dexec.args="--run-all-variants"
 ```
 
+## Methodology
+
+This template implements the **Improvement Flywheel** — a loss-driven method for iterative agent improvement. The canonical reference is [`improvement-flywheel.md`](https://github.com/markpollack/agento-forge/blob/main/concepts/improvement-flywheel.md) in agento-forge.
+
+Key concepts:
+- **Cycle**: RUN → MEASURE → DIAGNOSE → INTERVENE → VERIFY
+- **7 loss dimensions**: outcome, behavioral, knowledge, tooling, evaluation, stability, regression
+- **5 intervention levers**: prompt, knowledge/skills, execution structure, model, rubric
+- **Loop types**: productive, friction, failure, diagnostic, degenerate
+- **Variants are empirically motivated** — each exists because the previous variant's analysis revealed a specific gap
+
+### Build Mode vs. Optimize Mode
+
+**Build mode**: Adding infrastructure — new judges, agent invoker customization, dataset expansion, knowledge file scaffolding. This is structural work on the experiment harness.
+
+**Optimize mode**: Running the improvement flywheel — executing variants, measuring loss signals, diagnosing gaps, intervening with targeted changes, and verifying deltas. This is iterative work on agent quality.
+
+When in optimize mode, follow the flywheel cycle strictly: don't skip DIAGNOSE (jumping from MEASURE to INTERVENE), don't skip VERIFY (moving to the next iteration without confirming the fix worked), and record every variant's finding and hypothesis in `experiment-config.yaml`.
+
 ## Dependencies
 
 - `experiment-core` (ai.tuvium) — ExperimentRunner, ComparisonEngine, ResultStore, SessionStore
