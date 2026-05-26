@@ -74,23 +74,80 @@ Implementation roadmap for the {{PROJECT_NAME}} experiment.
 
 ---
 
-## Stage 2: Variant Execution
+## Stage 2: Improvement Flywheel
 
-### Step 2.0: Write Prompts and Knowledge
+### Step 2.0: Phase 0 — State Taxonomy Discovery
 
-**Work items**:
-- [ ] WRITE prompt files for each variant
-- [ ] WRITE knowledge files
-- [ ] CONFIGURE variant specs in experiment-config.yaml
-
-### Step 2.1: Run Variants
+**Entry criteria**:
+- [ ] Stage 1 complete — agent runs and produces results
 
 **Work items**:
-- [ ] RUN all variants: `--run-all-variants`
-- [ ] REVIEW growth story output
-- [ ] ANALYZE results
+- [ ] RUN control variant 3–5 times to generate tool-call data
+- [ ] RUN discovery mode: `MARKOV_DISCOVERY=true python scripts/make_markov_analysis.py`
+- [ ] INSPECT clusters — identify related tool calls representing coherent activities
+- [ ] DEFINE state taxonomy — name the clusters (verbs, 5–12 states, diagnostic value)
+- [ ] CONFIGURE `classify_state()` in `make_markov_analysis.py`
+- [ ] DEFINE cluster groups (productive, friction, knowledge access)
 
 **Exit criteria**:
-- [ ] `analysis/growth-story.md` generated with all variants
-- [ ] Create: `plans/learnings/step-2.1-results.md`
+- [ ] `classify_state()` produces coherent transition matrices
+- [ ] Cluster groups defined
+- [ ] Create: `plans/learnings/step-2.0-taxonomy.md`
+- [ ] COMMIT
+
+### Step 2.1: Baseline (control)
+
+**Entry criteria**:
+- [ ] Step 2.0 complete
+
+**Work items**:
+- [ ] WRITE control prompt (`prompts/v0-naive.txt`)
+- [ ] RUN: `--variant control`
+- [ ] MEASURE: run `make_markov_analysis.py` and review `analysis/markov-interpretation.md`
+- [ ] DIAGNOSE: identify dominant loss dimension from amplification and scores
+- [ ] RECORD iteration metadata in `experiment-config.yaml` (finding: null, hypothesis)
+
+**Exit criteria**:
+- [ ] Baseline scores and Markov analysis captured
+- [ ] Dominant loss dimension identified for next variant
+- [ ] Create: `plans/learnings/step-2.1-baseline.md`
+- [ ] COMMIT
+
+### Step 2.2: Iteration 1 (variant-a)
+
+**Entry criteria**:
+- [ ] Step 2.1 complete — baseline diagnosis identifies target loss
+
+**Work items**:
+- [ ] INTERVENE: create prompt/knowledge targeting the diagnosed loss (choose lever)
+- [ ] RUN: `--variant variant-a`
+- [ ] VERIFY: compare against baseline — did the targeted loss decrease?
+- [ ] CHECK for regressions in growth story
+- [ ] RECORD iteration metadata (finding from baseline, hypothesis, delta)
+
+**Exit criteria**:
+- [ ] Comparison report shows delta for targeted dimension
+- [ ] No unaddressed regressions
+- [ ] Create: `plans/learnings/step-2.2-iteration1.md`
+- [ ] COMMIT
+
+### Step 2.N: Further Iterations
+
+Repeat the flywheel cycle for each subsequent variant:
+1. **DIAGNOSE** the latest variant's remaining loss
+2. **INTERVENE** with the appropriate lever
+3. **VERIFY** the delta and check for regressions
+4. **RECORD** iteration metadata
+
+### Step 2.K: Stage 2 Consolidation
+
+**Work items**:
+- [ ] RUN `--run-all-variants` for final comparison
+- [ ] REVIEW `analysis/comparison-report.md` for overall progression
+- [ ] REVIEW `analysis/markov-interpretation.md` for behavioral improvement
+- [ ] COMPACT learnings — what worked, what regressed, what lever was most effective
+
+**Exit criteria**:
+- [ ] Growth story shows variant progression with iteration motivation
+- [ ] Create: `plans/learnings/step-2.K-results.md`
 - [ ] COMMIT
