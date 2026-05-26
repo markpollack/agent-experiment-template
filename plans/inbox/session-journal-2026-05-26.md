@@ -91,6 +91,22 @@ Added flywheel methodology and template references to the experiment-driver docu
 - **Amplification thresholds**: HIGH >= 2.0, moderate >= 1.5 — based on flywheel concept doc evidence
 - **Pre-existing compile issues** were caused by stale SNAPSHOT dependencies, not code bugs
 
+### 4. Merge Resolution and Push
+
+Remote had 2 commits ahead (Java 21 bump, workflow-journal dependency, agent-client 0.15.0 intermediate). Merge conflict in pom.xml resolved: kept our BOM 1.0.12 versions, adopted workflow-journal dependency from remote.
+
+Both repos pushed to origin/main:
+- `agent-experiment-template` → `883b7a4..c6233c7` (19 commits + merge)
+- `docs` → `4e76803..1afa65a` (1 commit)
+
+## Repos touched
+
+| Repo | Location | Branch | Pushed |
+|------|----------|--------|--------|
+| agent-experiment-template | `~/projects/agent-experiment-template` | main | Yes |
+| docs | `~/projects/docs` | main | Yes |
+| agento-forge | `~/projects/agento-forge` | — | Read-only (VISION, DESIGN, ROADMAP, flywheel concept) |
+
 ## What's next (from the original handoff)
 
 - **Workstream 2**: Update `/forge-eval-agent` skill — plans at `~/projects/agento-forge/plans/flywheel-skill/`
