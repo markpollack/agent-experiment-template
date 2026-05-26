@@ -40,19 +40,35 @@ domain-specific setup/teardown is needed._
 
 ## Variant Ablation
 
-| Variant | Prompt | Knowledge | Phase | Expected Outcome |
-|---------|--------|-----------|-------|-----------------|
-| control | v0-naive | none | single | Baseline — model's built-in knowledge only |
-| variant-a | v1-hardened | none | single | Prompt effect — structured execution adds value? |
-| variant-b | v2-with-kb | targeted files | single | Knowledge effect — domain KB adds value? |
-| variant-c | v2-with-kb | full tree (index.md) | single | Navigation effect — routing table + more KB? |
-| variant-d | v3-explore/act | full tree (index.md) | two-phase | Consumption effect — structured reading adds value? |
+Variants are **empirically motivated** — each exists because the previous variant's analysis revealed a specific gap. The table below shows the starting plan; actual variants will evolve based on measurement.
 
-**Ablation logic:**
-- control → variant-a: isolates prompt improvement (∆ = execution structure)
-- variant-a → variant-b: isolates knowledge addition (∆ = domain KB)
-- variant-b → variant-c: isolates knowledge breadth (∆ = more KB + routing)
-- variant-c → variant-d: isolates consumption pattern (∆ = explore/act phases)
+| Variant | Prompt | Knowledge | Phase | Iteration Metadata |
+|---------|--------|-----------|-------|--------------------|
+| control | v0-naive | none | single | finding: null, hypothesis: "Establish baseline" |
+| variant-a | v1-hardened | none | single | finding: _from control analysis_, hypothesis: _TBD_ |
+| variant-b | v2-with-kb | targeted files | single | finding: _from variant-a analysis_, hypothesis: _TBD_ |
+
+**Iteration metadata** links each variant to its motivating observation:
+
+```yaml
+iteration:
+  finding: "v0 BUILD→FIX loop amplification 3.2"
+  hypothesis: "Structured execution steps reduce fix loops"
+```
+
+Pre-planning more than 2–3 variants is fine for hypothesis-driven experiments, but fill in `finding` and `hypothesis` after each run, not before.
+
+## Measurement Strategy
+
+**Loss dimensions to track:**
+
+| Dimension | Signal | Tool |
+|-----------|--------|------|
+| _Outcome_ | _Pass rate, judge scores_ | _GrowthStoryReporter_ |
+| _Behavioral_ | _Loop amplification_ | _make_markov_analysis.py_ |
+| _Knowledge_ | _Search state frequency_ | _Markov state distribution_ |
+
+**Regression criteria:** A change is a regression if any per-judge score decreases by more than _X_ across the dataset, even if the aggregate improves.
 
 ## Two-Phase Pattern
 
