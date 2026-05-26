@@ -26,3 +26,17 @@ Compacted learnings from each stage of the flywheel wiring workstream.
 - When `iteration` absent from YAML, IterationMetadata is null — no enforcement at parse time.
 
 **Pre-existing compile issue**: `ExperimentRunner` was renamed to `AgentExperiment` in experiment-core, and `Jury` moved packages. Template's SNAPSHOT dependency is stale. VariantSpec and the parsing code compile correctly in isolation.
+
+## Stage 3: Analysis and Reporting Enhancements
+
+**What was done**: Added interpretation output to `make_markov_analysis.py` and enhanced `GrowthStoryReporter.java`.
+
+**Markov interpretation** (`analysis/markov-interpretation.md`):
+- Per-variant loop amplification table with threshold-based classification (HIGH >= 2.0, moderate >= 1.5)
+- Maps each high-amplification state to a recommended intervention lever and loss dimension
+- Suggests next variant with hypothesis template based on the latest variant's dominant loss
+
+**GrowthStoryReporter enhancements**:
+- `appendIterationMotivation(VariantSpec)` adds finding→hypothesis before score data (no-op when metadata absent)
+- `appendComparison()` now flags regressions with explicit WARNING when any `ScoreComparison.regressions() > 0`
+- `runAllVariants()` calls motivation before comparison/baseline for each variant
