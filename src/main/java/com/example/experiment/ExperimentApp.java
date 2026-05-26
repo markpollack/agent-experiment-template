@@ -457,7 +457,14 @@ public class ExperimentApp {
 					? (List<String>) rv.get("knowledgeFiles")
 					: List.of();
 			String orchestration = (String) rv.get("orchestration");
-			variants.add(new VariantSpec(name, promptFile, actPromptFile, knowledgeDir, knowledgeFiles, orchestration, null, null));
+			VariantSpec.IterationMetadata iteration = null;
+			Map<String, Object> iterationRaw = (Map<String, Object>) rv.get("iteration");
+			if (iterationRaw != null) {
+				String finding = (String) iterationRaw.get("finding");
+				String hypothesis = (String) iterationRaw.get("hypothesis");
+				iteration = new VariantSpec.IterationMetadata(finding, hypothesis);
+			}
+			variants.add(new VariantSpec(name, promptFile, actPromptFile, knowledgeDir, knowledgeFiles, orchestration, null, iteration));
 		}
 
 		return new ExperimentVariantConfig(
