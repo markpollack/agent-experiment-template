@@ -269,6 +269,119 @@ def load_data():
     return items, tools
 
 # ---------------------------------------------------------------------------
+# Interpretation — maps amplification to flywheel diagnostics
+# ---------------------------------------------------------------------------
+
+# Amplification thresholds for loop classification
+_THRESHOLD_HIGH = 2.0     # friction or failure loop
+_THRESHOLD_MODERATE = 1.5  # worth watching
+
+# Map states to recommended intervention levers (from improvement-flywheel.md)
+_LEVER_MAP = {
+    "FIX":         ("Lever 2 (knowledge)", "Add fix patterns to knowledge/domain/"),
+    "BUILD":       ("Lever 3 (execution structure)", "Pre-validate before build; add deterministic build script"),
+    "SHELL":       ("Lever 2 (knowledge)", "Add the target information to knowledge/"),
+    "JAR_INSPECT": ("Lever 2 (knowledge)", "Add framework imports/classes to knowledge/domain/"),
+    "EXPLORE":     ("Lever 1 (prompt)", "Clarify task decomposition or add Lever 3 pre-analysis script"),
+    "READ_KB":     ("—", "Knowledge access is generally productive"),
+    "READ_SKILL":  ("—", "Skill access is generally productive"),
+    "WRITE":       ("—", "Writing is forward progress"),
+    "VERIFY":      ("—", "Verification is productive"),
+}
+
+# Loss dimension associated with each state
+_LOSS_MAP = {
+    "FIX":         "behavioral",
+    "BUILD":       "behavioral",
+    "SHELL":       "knowledge",
+    "JAR_INSPECT": "knowledge",
+    "EXPLORE":     "behavioral",
+    "READ_KB":     "knowledge",
+    "READ_SKILL":  "knowledge",
+    "WRITE":       "outcome",
+    "VERIFY":      "outcome",
+}
+
+
+def write_interpretation(results: dict) -> None:
+    """Write analysis/markov-interpretation.md with flywheel-aligned diagnostics."""
+    amplification = results.get("amplification", {})
+    if not amplification:
+        print("  No amplification data — skipping interpretation output")
+        return
+
+    ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = ANALYSIS_DIR / "markov-interpretation.md"
+
+    lines = ["# Markov Interpretation\n"]
+    lines.append("> Auto-generated from loop amplification data. ")
+    lines.append("See [improvement-flywheel.md](https://github.com/markpollack/agento-forge/blob/main/concepts/improvement-flywheel.md) for methodology.\n")
+
+    # --- Per-variant amplification summary ---
+    lines.append("\n## Loop Amplification Summary\n")
+    lines.append("| Variant | State | Amplification | Classification | Recommended Lever | Suggestion |")
+    lines.append("|---------|-------|--------------|----------------|-------------------|------------|")
+
+    dominant_loss = {}  # variant → (state, amplification, loss_dimension)
+
+    for variant in VARIANT_ORDER:
+        if variant not in amplification:
+            continue
+        state_amps = amplification[variant]
+        # Sort by amplification descending
+        sorted_states = sorted(state_amps.items(), key=lambda x: x[1], reverse=True)
+
+        max_amp_state = None
+        max_amp_val = 0.0
+
+        for state, amp in sorted_states:
+            if amp < _THRESHOLD_MODERATE:
+                continue
+
+            classification = "HIGH" if amp >= _THRESHOLD_HIGH else "moderate"
+            lever, suggestion = _LEVER_MAP.get(state, ("—", "Investigate"))
+            lines.append(f"| {variant} | {state} | {amp:.2f} | {classification} | {lever} | {suggestion} |")
+
+            if amp > max_amp_val:
+                max_amp_val = amp
+                max_amp_state = state
+
+        if max_amp_state:
+            loss_dim = _LOSS_MAP.get(max_amp_state, "behavioral")
+            dominant_loss[variant] = (max_amp_state, max_amp_val, loss_dim)
+
+    lines.append("")
+
+    # --- Suggested next variant ---
+    if dominant_loss:
+        lines.append("\n## Suggested Next Variant\n")
+        # Use the last variant in order that has data
+        for variant in reversed(VARIANT_ORDER):
+            if variant in dominant_loss:
+                state, amp, loss_dim = dominant_loss[variant]
+                lever, suggestion = _LEVER_MAP.get(state, ("—", "Investigate"))
+                lines.append(f"Based on **{variant}** analysis:\n")
+                lines.append(f"- **Dominant loss dimension**: {loss_dim}")
+                lines.append(f"- **Highest amplification**: {state} ({amp:.2f})")
+                lines.append(f"- **Recommended lever**: {lever}")
+                lines.append(f"- **Suggested intervention**: {suggestion}")
+                lines.append(f"\n**Hypothesis template**: \"{suggestion} will reduce {state} amplification from {amp:.1f} to < {_THRESHOLD_MODERATE}\"")
+                break
+        lines.append("")
+
+    # --- Variants with no high-amplification states ---
+    clean_variants = [v for v in VARIANT_ORDER if v in amplification and v not in dominant_loss]
+    if clean_variants:
+        lines.append("\n## Variants with Low Amplification\n")
+        for v in clean_variants:
+            lines.append(f"- **{v}**: All states below {_THRESHOLD_MODERATE} amplification — no friction or failure loops detected.")
+        lines.append("")
+
+    out_path.write_text("\n".join(lines))
+    print(f"  Interpretation: {out_path}")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -301,7 +414,12 @@ if __name__ == "__main__":
         note_map=NOTE_MAP,
         enable_sankey=True,
     )
-    pipeline.run(tools, items)
+    results = pipeline.run(tools, items)
+
+    # -----------------------------------------------------------------------
+    # Interpretation output — maps amplification data to flywheel diagnostics
+    # -----------------------------------------------------------------------
+    write_interpretation(results)
 
     # Generate cost/steps bar chart — the "money shot"
     print("\nGenerating cost vs steps bar chart...")
