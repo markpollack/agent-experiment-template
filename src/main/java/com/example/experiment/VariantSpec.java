@@ -23,15 +23,23 @@ public record VariantSpec(
 		String knowledgeDir,
 		List<String> knowledgeFiles,
 		@Nullable String orchestration,
-		java.util.Map<String, String> judgeOverrides) {
+		java.util.Map<String, String> judgeOverrides,
+		@Nullable IterationMetadata iteration) {
+
+	/**
+	 * Iteration metadata linking a variant to the observation that motivated it.
+	 * @param finding observation from the prior variant's analysis (null for baseline)
+	 * @param hypothesis what this variant tests — the expected improvement
+	 */
+	public record IterationMetadata(@Nullable String finding, String hypothesis) {}
 
 	public VariantSpec(String name, String promptFile, String knowledgeDir, List<String> knowledgeFiles) {
-		this(name, promptFile, null, knowledgeDir, knowledgeFiles, null, null);
+		this(name, promptFile, null, knowledgeDir, knowledgeFiles, null, null, null);
 	}
 
 	public VariantSpec(String name, String promptFile, @Nullable String actPromptFile,
 			String knowledgeDir, List<String> knowledgeFiles) {
-		this(name, promptFile, actPromptFile, knowledgeDir, knowledgeFiles, null, null);
+		this(name, promptFile, actPromptFile, knowledgeDir, knowledgeFiles, null, null, null);
 	}
 
 	/** Whether this variant uses a two-phase (explore + act) invocation pattern. */

@@ -457,7 +457,7 @@ public class ExperimentApp {
 					? (List<String>) rv.get("knowledgeFiles")
 					: List.of();
 			String orchestration = (String) rv.get("orchestration");
-			variants.add(new VariantSpec(name, promptFile, actPromptFile, knowledgeDir, knowledgeFiles, orchestration, null));
+			variants.add(new VariantSpec(name, promptFile, actPromptFile, knowledgeDir, knowledgeFiles, orchestration, null, null));
 		}
 
 		return new ExperimentVariantConfig(
