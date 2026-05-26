@@ -6,12 +6,21 @@ variants:
     promptFile: v0-naive.txt
     knowledgeDir: null
     knowledgeFiles: []
+    iteration:
+      finding: null
+      hypothesis: "Establish baseline agent behavior"
   - name: variant-a
     promptFile: v1-hardened.txt
     knowledgeDir: null
     knowledgeFiles: []
+    iteration:
+      finding: "v0 behavioral analysis pending — placeholder"
+      hypothesis: "Structured execution steps reduce fix loops"
   - name: variant-b
     promptFile: v2-with-kb.txt
     knowledgeDir: knowledge
     knowledgeFiles:
       - index.md
+    iteration:
+      finding: "v1 knowledge gaps pending — placeholder"
+      hypothesis: "Knowledge files eliminate search friction"
