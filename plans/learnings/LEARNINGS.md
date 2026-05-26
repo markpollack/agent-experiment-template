@@ -50,3 +50,9 @@ Compacted learnings from each stage of the flywheel wiring workstream.
 **DESIGN-TEMPLATE.md**: Reframed Variant Ablation around empirical motivation (not pre-planned ablation). Added iteration metadata YAML pattern. Added Measurement Strategy with loss dimensions and regression criteria. Reduced pre-planned variants from 5 to 3.
 
 **ROADMAP-TEMPLATE.md**: Replaced "write prompts and run" Stage 2 with flywheel-structured iterations. Added Phase 0 taxonomy discovery as explicit prerequisite. Each step follows RUN/MEASURE/DIAGNOSE/INTERVENE/VERIFY with references to analysis outputs.
+
+## Stage 5: Validation
+
+All changed files compile/parse cleanly. Vocabulary is consistent across README, CLAUDE.md, Java, Python, and plan templates. README Analysis Scripts section updated to mention markov-interpretation.md.
+
+Pre-existing issue: experiment-core SNAPSHOT dependency has stale class names (ExperimentRunner→AgentExperiment, Jury package move). Unrelated to this workstream.

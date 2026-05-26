@@ -231,7 +231,7 @@ Each script has a `# CUSTOMIZE` section at the top:
 |--------|--------|
 | `load_results.py` | `data/curated/*.parquet` — 4 tables: runs, item_results, tool_uses, judge_details |
 | `make_figures.py` | `docs/figures/*.pdf + *.png` — pass rate, cost/quality, per-item breakdown |
-| `make_markov_analysis.py` | `docs/figures/*.pdf + *.png` — transition matrices, fundamental matrix, loop amplification, Sankey flows |
+| `make_markov_analysis.py` | `docs/figures/*.pdf + *.png` — transition matrices, fundamental matrix, loop amplification, Sankey flows; `analysis/markov-interpretation.md` — flywheel diagnostics with intervention recommendations |
 
 ## Requirements
 
