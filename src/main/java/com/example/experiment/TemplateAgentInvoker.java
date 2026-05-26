@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
  * <p><strong>To customize:</strong></p>
  * <ol>
  *   <li>Rename this class to {@code {Domain}AgentInvoker}</li>
- *   <li>Inject an {@link org.springaicommunity.agents.client.AgentClient}</li>
+ *   <li>Inject an {@link io.github.markpollack.agents.client.AgentClient}</li>
  *   <li>Override {@link #preInvoke} for domain-specific setup</li>
  *   <li>Implement {@link #invokeAgent} with real agent interaction</li>
  *   <li>Override {@link #postInvoke} for domain-specific measurement</li>

@@ -4,13 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.springaicommunity.judge.Judge;
-import org.springaicommunity.judge.jury.CascadedJury;
-import org.springaicommunity.judge.jury.Jury;
-import org.springaicommunity.judge.jury.ConsensusStrategy;
-import org.springaicommunity.judge.jury.SimpleJury;
-import org.springaicommunity.judge.jury.TierConfig;
-import org.springaicommunity.judge.jury.TierPolicy;
+import io.github.markpollack.judge.Judge;
+import io.github.markpollack.judge.jury.CascadedJury;
+import io.github.markpollack.judge.jury.Jury;
+import io.github.markpollack.judge.jury.ConsensusStrategy;
+import io.github.markpollack.judge.jury.SimpleJury;
+import io.github.markpollack.judge.jury.TierConfig;
+import io.github.markpollack.judge.jury.TierPolicy;
 /**
  * Factory for building {@link Jury} instances from variant specifications.
  * Pre-wired with standard tier structure:

@@ -24,7 +24,7 @@ import io.github.markpollack.experiment.dataset.DatasetManager;
 import io.github.markpollack.experiment.dataset.FileSystemDatasetManager;
 import io.github.markpollack.experiment.result.ExperimentResult;
 import io.github.markpollack.experiment.runner.ExperimentConfig;
-import io.github.markpollack.experiment.runner.ExperimentRunner;
+import io.github.markpollack.experiment.runner.AgentExperiment;
 import io.github.markpollack.experiment.store.ActiveSession;
 import io.github.markpollack.experiment.store.FileSystemResultStore;
 import io.github.markpollack.experiment.store.FileSystemSessionStore;
@@ -39,9 +39,9 @@ import io.github.markpollack.experiment.store.SweepVariantResolution;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springaicommunity.judge.exec.BuildSuccessJudge;
-import org.springaicommunity.judge.jury.Jury;
-import org.springaicommunity.judge.jury.TierPolicy;
+import io.github.markpollack.judge.exec.BuildSuccessJudge;
+import io.github.markpollack.judge.jury.Jury;
+import io.github.markpollack.judge.jury.TierPolicy;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -121,7 +121,7 @@ public class ExperimentApp {
 				? new SlugFilteringDatasetManager(variantConfig.datasetManager(), variantConfig.itemSlugFilter())
 				: variantConfig.datasetManager();
 
-		ExperimentRunner runner = new ExperimentRunner(
+		AgentExperiment runner = new AgentExperiment(
 				datasetManager, jury, resultStore, sessionStore, config);
 
 		ActiveSession activeSession = new ActiveSession(
