@@ -174,6 +174,7 @@ public class ExperimentApp {
 			for (VariantSpec variant : variants) {
 				ExperimentResult result = runVariant(variant, sessionName);
 
+				reporter.appendIterationMotivation(variant);
 				if (previousResult != null) {
 					ComparisonResult comparison = comparisonEngine.compare(result, previousResult);
 					reporter.appendComparison(variant.name(), comparison);

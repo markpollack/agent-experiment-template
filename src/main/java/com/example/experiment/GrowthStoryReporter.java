@@ -62,6 +62,23 @@ public class GrowthStoryReporter {
 	}
 
 	/**
+	 * Append iteration motivation (finding + hypothesis) when metadata is present.
+	 */
+	public void appendIterationMotivation(VariantSpec variant) {
+		if (variant.iteration() == null) {
+			return;
+		}
+		VariantSpec.IterationMetadata meta = variant.iteration();
+		StringBuilder sb = new StringBuilder();
+		sb.append("### Motivation: ").append(variant.name()).append("\n\n");
+		if (meta.finding() != null) {
+			sb.append("**Finding**: ").append(meta.finding()).append("\n\n");
+		}
+		sb.append("**Hypothesis**: ").append(meta.hypothesis()).append("\n\n");
+		sections.add(sb.toString());
+	}
+
+	/**
 	 * Append a comparison between the current variant and its predecessor.
 	 */
 	public void appendComparison(String variantName, ComparisonResult comparison) {
@@ -69,6 +86,7 @@ public class GrowthStoryReporter {
 		sb.append("### Prompt Version: ").append(variantName).append(" (vs previous)\n\n");
 
 		Map<String, ScoreComparison> scores = comparison.scoreComparisons();
+		boolean hasRegressions = false;
 		if (!scores.isEmpty()) {
 			sb.append("| Judge | Current | Baseline | Delta | Improved | Regressed |\n");
 			sb.append("|-------|---------|----------|-------|----------|----------|\n");
@@ -78,8 +96,16 @@ public class GrowthStoryReporter {
 						: String.format("%.3f", sc.delta());
 				sb.append(String.format("| %s | %.3f | %.3f | %s | %d | %d |\n", entry.getKey(), sc.currentMean(),
 						sc.baselineMean(), deltaStr, sc.improvements(), sc.regressions()));
+				if (sc.regressions() > 0) {
+					hasRegressions = true;
+				}
 			}
 			sb.append("\n");
+		}
+
+		if (hasRegressions) {
+			sb.append("**WARNING: Regressions detected.** One or more judges show decreased scores. ");
+			sb.append("Review per-criterion deltas before proceeding to the next iteration.\n\n");
 		}
 
 		ExperimentSummary summary = comparison.summary();
