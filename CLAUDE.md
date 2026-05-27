@@ -10,6 +10,8 @@ Standard template for agent experiments with pre-wired experiment loop. Used by 
 - `AbstractTemplateAgentInvoker` — Template-method base with pre/post hooks and knowledge injection
 - `TemplateAgentInvoker` — Single-phase placeholder (rename to `{Domain}AgentInvoker`)
 - `TwoPhaseTemplateAgentInvoker` — Two-phase (explore + act) placeholder
+- `WorkflowAgentInvoker` — Single-step workflow with journal integration (extends `AbstractTemplateAgentInvoker`)
+- `WorkflowInvoker<S>` — Multi-step typed workflow base with journal + cost tracking (implement `buildWorkflow`/`buildInitialState`)
 - `SlugFilteringDatasetManager` — Single-item smoke testing via `--item`
 - `JuryFactory` — Builds CascadedJury with tier-0 BuildSuccessJudge pre-wired
 - `GrowthStoryReporter` — Variant comparison → markdown growth story
@@ -70,4 +72,5 @@ When in optimize mode, follow the flywheel cycle strictly: don't skip DIAGNOSE (
 - `spring-ai-agent-client` + `spring-ai-claude-agent` — Single-phase agent invocation
 - `claude-code-sdk` — Two-phase session support (ClaudeSyncClient)
 - `journal-core` + `claude-code-capture` — Phase capture and session log parsing
+- `workflow-journal` — Journal integration for workflow step tracing
 - `javaparser-core` — AST analysis for custom judges
