@@ -8,6 +8,7 @@ import io.github.markpollack.agents.client.AgentClientResponse;
 import io.github.markpollack.experiment.agent.InvocationContext;
 import io.github.markpollack.journal.Journal;
 import io.github.markpollack.journal.Run;
+import io.github.markpollack.journal.storage.JsonFileStorage;
 import io.github.markpollack.workflow.core.AgentContext;
 import io.github.markpollack.workflow.flows.steps.AgentClient;
 import io.github.markpollack.workflow.flows.steps.AgentClientStep;
@@ -31,9 +32,12 @@ public class WorkflowAgentInvoker extends AbstractTemplateAgentInvoker {
 
 	private static final Logger logger = LoggerFactory.getLogger(WorkflowAgentInvoker.class);
 
-	private static final Path TRACE_DIR = Path.of("results", "traces");
+	private static final Path TRACE_DIR = Path.of("experiments", "traces");
+
+	private static final Path JOURNAL_DIR = Path.of("experiments", "traces", ".agent-journal");
 
 	static {
+		Journal.configure(new JsonFileStorage(JOURNAL_DIR));
 		WorkflowJournal.registerEventType();
 	}
 
