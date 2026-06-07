@@ -18,6 +18,8 @@
 
         <!-- Dependency versions -->
         <experiment-core.version>0.5.0</experiment-core.version>
+        <!-- 0.6.0-SNAPSHOT until agent-experiment 0.6.0 releases -->
+        <experiment-workflow.version>0.6.0-SNAPSHOT</experiment-workflow.version>
         <agent-judge.version>0.12.0</agent-judge.version>
         <agent-client.version>0.20.0</agent-client.version>
         <agent-workflow.version>0.9.0</agent-workflow.version>
@@ -49,6 +51,11 @@
             <groupId>io.github.markpollack</groupId>
             <artifactId>experiment-core</artifactId>
             <version>${experiment-core.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>experiment-workflow</artifactId>
+            <version>${experiment-workflow.version}</version>
         </dependency>
 
         <!-- Agent judge -->

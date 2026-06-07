@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import io.github.markpollack.experiment.agent.AgentInvoker;
+import io.github.markpollack.experiment.workflow.WorkflowAgentInvoker;
 import io.github.markpollack.experiment.comparison.ComparisonEngine;
 import io.github.markpollack.experiment.comparison.ComparisonResult;
 import io.github.markpollack.experiment.comparison.DefaultComparisonEngine;

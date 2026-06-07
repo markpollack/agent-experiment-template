@@ -7,11 +7,11 @@ Standard template for agent experiments with pre-wired experiment loop. Used by 
 - `ExperimentApp` — Full CLI with `--variant`, `--item`, `--run-all-variants`, `--project-root`
 - `ExperimentVariantConfig` — Top-level config loaded from experiment-config.yaml, with item filtering
 - `VariantSpec` — Per-variant specification with two-phase support (`actPromptFile`, `isTwoPhase()`)
-- `AbstractTemplateAgentInvoker` — Template-method base with pre/post hooks and knowledge injection
+- `AbstractTemplateAgentInvoker` — Template-method base with pre/post hooks and knowledge injection (from `experiment-workflow` library; do not edit)
 - `TemplateAgentInvoker` — Single-phase placeholder (rename to `{Domain}AgentInvoker`)
 - `TwoPhaseTemplateAgentInvoker` — Two-phase (explore + act) placeholder
-- `WorkflowAgentInvoker` — Single-step workflow with trace capture via `AgentClientStep` + `ClaudeAgentModel` (extends `AbstractTemplateAgentInvoker`). Preferred over `ClaudeStep` for experiments — produces JSONL trace files with full tool-call data for Markov analysis.
-- `WorkflowInvoker<S>` — Multi-step typed workflow base with journal + cost tracking (implement `buildWorkflow`/`buildInitialState`)
+- `WorkflowAgentInvoker` — Single-step workflow with trace capture via `AgentClientStep` + `ClaudeAgentModel` (from `experiment-workflow` library; extend, don't edit). Preferred over `ClaudeStep` for experiments — produces JSONL trace files with full tool-call data for Markov analysis.
+- `WorkflowInvoker<S>` — Multi-step typed workflow base with journal + cost tracking (from `experiment-workflow` library; implement `buildWorkflow`/`buildInitialState`)
 - `SlugFilteringDatasetManager` — Single-item smoke testing via `--item`
 - `JuryFactory` — Builds CascadedJury with tier-0 BuildSuccessJudge pre-wired
 - `GrowthStoryReporter` — Variant comparison → markdown growth story
