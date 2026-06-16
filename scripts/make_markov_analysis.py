@@ -38,8 +38,11 @@ State taxonomy rationale (code-coverage-v2):
   SEARCH cluster = SHELL + JAR_INSPECT (all unstructured searching)
   FIX_LOOP cluster = FIX + BUILD (rework cycle)
 
-Requires markov-agent-analysis library:
-    uv pip install -e ~/tuvium/projects/markov-agent-analysis/[all]
+Requires the agent-control-theory library — DEPEND on it, do not copy its code.
+It also provides Lyapunov / EXPLORE-quality / drift_check / validation (import them,
+don't re-vendor). The package ships a back-compat `markov_agent_analysis` shim, but
+new code should import `agent_control_theory`.
+    uv pip install -e ~/projects/agent-control-theory[all]
 
 Run:
     python scripts/make_markov_analysis.py
@@ -53,9 +56,9 @@ import duckdb
 import matplotlib
 matplotlib.use("Agg")
 
-from markov_agent_analysis import MarkovAnalysisPipeline
-from markov_agent_analysis.transitions import apply_classify, build_transition_counts, normalize_to_probability_matrix
-from markov_agent_analysis.figures import make_single_transition_matrix
+from agent_control_theory import MarkovAnalysisPipeline
+from agent_control_theory.transitions import apply_classify, build_transition_counts, normalize_to_probability_matrix
+from agent_control_theory.figures import make_single_transition_matrix
 
 # ---------------------------------------------------------------------------
 # Paths

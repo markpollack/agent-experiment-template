@@ -1,17 +1,15 @@
-# Core data
+# Analysis: DEPEND on the agent-control-theory library — do NOT copy its code or
+# re-list its transitive deps here. It provides Markov/Lyapunov/EXPLORE-quality,
+# figures, validation, loaders, and the control judge. Install it editable:
+#
+#     uv pip install -e ~/projects/agent-control-theory[all]
+#     # or: pip install -e "~/projects/agent-control-theory[all]"
+#
+# The [all] extra pulls scipy/plotly/kaleido/networkx and numpy/matplotlib transitively,
+# so they are intentionally NOT pinned here (pinning them = the copy anti-pattern).
+# Back-compat: the package also exposes a `markov_agent_analysis` shim, but new code
+# should import `agent_control_theory`.
+
+# Direct deps of the LOCAL driver glue only (ETL + stub figures) — not provided by the library:
 duckdb>=0.9
 pandas>=2.0
-numpy>=1.24
-
-# Figures
-matplotlib>=3.7
-
-# Markov analysis library (install from local source)
-# pip install -e path/to/markov-agent-analysis[all]
-# or: uv pip install -e path/to/markov-agent-analysis[all]
-#
-# For now, install deps manually since path varies:
-scipy>=1.10
-plotly>=5.0
-kaleido>=0.2
-networkx>=3.0
