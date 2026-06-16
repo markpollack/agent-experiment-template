@@ -20,10 +20,10 @@
         <experiment-core.version>0.5.0</experiment-core.version>
         <!-- 0.6.0-SNAPSHOT until agent-experiment 0.6.0 releases -->
         <experiment-workflow.version>0.6.0-SNAPSHOT</experiment-workflow.version>
-        <agent-judge.version>0.12.0</agent-judge.version>
-        <agent-client.version>0.20.0</agent-client.version>
-        <agent-workflow.version>0.9.0</agent-workflow.version>
-        <claude-code-sdk.version>1.3.0</claude-code-sdk.version>
+        <agent-judge.version>0.13.0</agent-judge.version>
+        <agent-client.version>0.23.0</agent-client.version>
+        <agent-workflow.version>0.10.0</agent-workflow.version>
+        <claude-code-sdk.version>1.4.0</claude-code-sdk.version>
         <journal.version>1.4.0</journal.version>
         <jackson.version>2.21.2</jackson.version>
         <snakeyaml.version>2.2</snakeyaml.version>
