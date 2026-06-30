@@ -17,12 +17,18 @@ CUSTOMIZE for a new domain:
   5. Update COLORS (optional — defaults are fine for exploration)
 
 Bootstrap procedure (do this BEFORE finalizing the taxonomy):
-  1. Run one control variant (N=1) to generate tool_uses.parquet
+  1. Run one control variant (N=1). The canonical journal is written on-by-default
+     under results/.../journal/.../runs/<runId>/{events,analysis}.jsonl — no ETL step.
   2. Run with MARKOV_DISCOVERY=true to see raw tool name + target frequencies:
          MARKOV_DISCOVERY=true python scripts/make_markov_analysis.py
      Then inspect: SELECT state, count(*) FROM tool_uses GROUP BY 1 ORDER BY 2 DESC
   3. Cluster the top-N patterns into named states
   4. Write classify_state() based on real data, then re-run normally
+
+Data source: the CANONICAL journal (events.jsonl + analysis.jsonl), read via
+agent_control_theory.load_journal(results_dir). The retired result-store ETL
+(load_results.py → data/curated/*.parquet) is a legacy fallback only — it cannot
+carry per-tool cost. See load_data() below.
 
 State taxonomy rationale (code-coverage-v2):
   EXPLORE     — targeted file access via Read/Glob (agent knows where to look)
@@ -262,7 +268,32 @@ def classify_state(tool_name: str, target: str) -> str | None:
 # Data loading
 # ---------------------------------------------------------------------------
 
+RESULTS_DIR = PROJECT_ROOT / "results"
+
+
 def load_data():
+    """Load (item_results_df, tool_uses_df) from the CANONICAL journal.
+
+    Primary source: the on-by-default agent-journal written beside each run
+    (events.jsonl + analysis.jsonl). ``load_journal`` discovers every run under
+    ``results/`` and returns the same column contract the rest of this script uses
+    (``variant``, ``item_id``, ``global_seq``, ``tool_name``, ``tool_target``) plus
+    per-tool ``attributed_cost_usd`` and its ``attribution_method`` — an *allocation*
+    (output-token-proportional), not a measurement; ``EVEN_SPLIT`` marks the coarse
+    fallback. ``require_cost=False`` so taxonomy-discovery runs work before cost lands.
+
+    Legacy fallback: the retired result-store ETL's parquet (load_results.py), kept
+    only for PRE-journal data — it has no per-tool cost.
+    """
+    try:
+        from agent_control_theory import load_journal
+
+        tools, items = load_journal(RESULTS_DIR, require_cost=False)
+        if tools is not None and not tools.empty:
+            return items, tools
+    except (ImportError, FileNotFoundError) as exc:
+        print(f"  Canonical journal unavailable ({exc}); falling back to result-store parquet")
+
     con = duckdb.connect()
     items = con.execute(f"SELECT * FROM '{DATA_DIR}/item_results.parquet'").df()
     tool_uses_path = DATA_DIR / "tool_uses.parquet"
@@ -396,13 +427,17 @@ if __name__ == "__main__":
     print("\nLoading data...")
     items, tools = load_data()
     if tools is None or tools.empty:
-        print("ERROR: No tool_uses.parquet found. Run load_results.py first.")
+        print("ERROR: no tool-call rows. Run a variant first — the canonical journal "
+              "(events.jsonl + analysis.jsonl) is written under results/ on-by-default, "
+              "read here via agent_control_theory.load_journal.")
         raise SystemExit(1)
     print(f"  tool_uses: {len(tools)} rows")
     print(f"  item_results: {len(items)} rows")
 
-    # NOTE: load_results.py already uses the library's expected column names:
-    #   item_id (not item_slug), tool_target (not target), global_seq for ordering
+    # load_journal returns the library's expected column names:
+    #   item_id (not item_slug), tool_target (not target), global_seq for ordering.
+    # TRAP 1 (journal): file order IS execution order — re-sort by (variant, item_id, global_seq)
+    # is the stable key, never by timestamp.
     tools = tools.sort_values(["variant", "item_id", "global_seq"])
 
     pipeline = MarkovAnalysisPipeline(

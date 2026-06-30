@@ -1,4 +1,18 @@
 """
+DEPRECATED — legacy result-store ETL. Prefer the canonical journal.
+
+    As of the first-class journal-capture feature, the trace source of truth is the
+    canonical agent-journal written on-by-default beside each run
+    (events.jsonl + analysis.jsonl). Read it with
+    `agent_control_theory.load_journal(results_dir)`, which returns the same
+    (tool_uses_df, item_results_df) shape this script produces — plus per-tool cost
+    (`attributed_cost_usd`) and its `attribution_method` provenance, which the
+    result-store path cannot recover.
+
+    This script is retained ONLY to read PRE-journal result-store data (DESIGN §7:
+    runs without per-turn usage can still yield step-count V(EXPLORE) + per-run cost,
+    but never per-tool cost). New experiments should NOT start here — use load_journal.
+
 ETL: Load experiment result JSON files into DuckDB-queryable parquet.
 
 Supports the session layout: results/{experiment}/sessions/{session}/{variant}.json

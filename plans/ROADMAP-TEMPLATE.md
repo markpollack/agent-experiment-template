@@ -82,7 +82,8 @@ Implementation roadmap for the {{PROJECT_NAME}} experiment.
 - [ ] Stage 1 complete — agent runs and produces results
 
 **Work items**:
-- [ ] RUN control variant 3–5 times to generate tool-call data
+- [ ] RUN control variant 3–5 times — the canonical journal (`events.jsonl` + `analysis.jsonl`) is
+      written on-by-default per run; no ETL step. (`make_markov_analysis.py` reads it via `load_journal`.)
 - [ ] RUN discovery mode: `MARKOV_DISCOVERY=true python scripts/make_markov_analysis.py`
 - [ ] INSPECT clusters — identify related tool calls representing coherent activities
 - [ ] DEFINE state taxonomy — name the clusters (verbs, 5–12 states, diagnostic value)
@@ -102,8 +103,9 @@ Implementation roadmap for the {{PROJECT_NAME}} experiment.
 
 **Work items**:
 - [ ] WRITE control prompt (`prompts/v0-naive.txt`)
-- [ ] RUN: `--variant control`
-- [ ] MEASURE: run `make_markov_analysis.py` and review `analysis/markov-interpretation.md`
+- [ ] RUN: `--variant control` (canonical journal captured automatically)
+- [ ] MEASURE: run `make_markov_analysis.py` (reads the canonical journal) and review
+      `analysis/markov-interpretation.md`; note cost is an **allocation** (`attribution_method`)
 - [ ] DIAGNOSE: identify dominant loss dimension from amplification and scores
 - [ ] RECORD iteration metadata in `experiment-config.yaml` (finding: null, hypothesis)
 

@@ -15,6 +15,13 @@ Standard template for agent experiments with pre-wired experiment loop. Used by 
 - `SlugFilteringDatasetManager` — Single-item smoke testing via `--item`
 - `JuryFactory` — Builds CascadedJury with tier-0 BuildSuccessJudge pre-wired
 - `GrowthStoryReporter` — Variant comparison → markdown growth story
+- **Canonical journal capture — ON BY DEFAULT.** `AgentExperiment` (experiment-core) owns the
+  run-journal lifecycle: every item writes `events.jsonl` (immutable) + `analysis.jsonl` (derived
+  per-tool `StepCostEvent`) under `results/.../journal/.../runs/<runId>/`. Wired by the template's
+  `outputDir` alone — your AgentInvoker writes **zero journal code**. The journal is the **trace
+  source of truth** the analysis layer reads (`agent_control_theory.load_journal`); the result store
+  stays the summary. Per-tool cost is an *allocation* (`attribution_method`), not a measurement.
+  Opt out for judge-only runs with `withoutJournal()`. Guarded by `JournalCaptureSmokeTest`.
 
 ## What You Customize (3 Pluggable Pieces)
 

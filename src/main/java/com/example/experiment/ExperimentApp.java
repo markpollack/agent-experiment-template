@@ -115,6 +115,15 @@ public class ExperimentApp {
 			.perItemTimeout(Duration.ofMinutes(variantConfig.timeoutMinutes()))
 			.knowledgeBaseDir(variant.knowledgeDir() != null ? projectRoot.resolve(variant.knowledgeDir()) : null)
 			.preserveWorkspaces(true)
+			// Canonical agent-journal capture is ON BY DEFAULT (experiment-core owns the
+			// run-journal lifecycle). Setting outputDir is all that's required: every item's
+			// PhaseCaptures are journaled to
+			//   results/<exp>/sessions/<session>/<variant>/journal/experiments/<exp>/runs/<runId>/
+			//     {run,events,analysis}.jsonl
+			// — immutable events + derived per-tool StepCostEvents — with no journal code in
+			// your AgentInvoker. The ETL (agent-control-theory's load_journal) reads this
+			// canonical schema directly. Lightweight/judge-only runs can opt out with
+			// .journalEnabled(false) (or the builder's withoutJournal()).
 			.outputDir(projectRoot.resolve("results"))
 			.build();
 

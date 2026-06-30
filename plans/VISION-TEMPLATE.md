@@ -34,8 +34,14 @@ _Define what "better" means for this experiment:_
 | Metric | Baseline target | Goal | How measured |
 |--------|----------------|------|-------------|
 | _Pass rate_ | _> 50%_ | _> 80%_ | _BuildSuccessJudge_ |
-| _Fix loop amplification_ | _< 3.0_ | _< 1.5_ | _Markov analysis_ |
+| _Fix loop amplification_ | _< 3.0_ | _< 1.5_ | _Markov analysis (canonical journal)_ |
 | _Domain score_ | _> 0.5_ | _> 0.8_ | _{{Domain}}Judge_ |
+| _Cost-weighted V(EXPLORE)_ | _TBD_ | _↓_ | _load_journal → cost_weighted_explore (allocation)_ |
+
+> **Traces & cost.** Every run writes a canonical agent-journal (`events.jsonl` + `analysis.jsonl`)
+> on-by-default — the trace source of truth the analysis layer reads via `load_journal`. Per-tool
+> cost is an **allocation** (output-token-proportional), not a wire measurement; it carries an
+> `attribution_method` and must be reported as such.
 
 ## Scope
 

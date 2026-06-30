@@ -5,12 +5,22 @@
 This experiment uses the standard agent experiment loop:
 
 ```
-ExperimentApp → ExperimentRunner → AgentInvoker → CascadedJury → ResultStore
-                                                                    ↓
-                                                          ComparisonEngine
-                                                                    ↓
-                                                        GrowthStoryReporter
+ExperimentApp → AgentExperiment → AgentInvoker → CascadedJury → ResultStore
+                       │                                            ↓
+                       │ (per item, on by default)        ComparisonEngine
+                       ▼                                            ↓
+              canonical agent-journal                     GrowthStoryReporter
+              events.jsonl + analysis.jsonl
+                       │
+                       ▼
+              agent_control_theory.load_journal → Markov / cost-weighted V(EXPLORE)
 ```
+
+`AgentExperiment` owns the run-journal lifecycle: for every item it opens a journal Run on
+`JsonFileStorage` (rooted under `outputDir`), records each `PhaseCapture`, and writes the immutable
+events plus derived per-tool `StepCostEvent`s. The **AgentInvoker writes no journal code** — it just
+returns `PhaseCapture`s. The result store remains the experiment summary; the **journal is the trace
+source of truth** the analysis layer consumes.
 
 ## Domain Agent
 
@@ -60,13 +70,21 @@ Pre-planning more than 2–3 variants is fine for hypothesis-driven experiments,
 
 ## Measurement Strategy
 
+**Trace source of truth:** the canonical agent-journal (`events.jsonl` + `analysis.jsonl`), written
+on-by-default per item. The analysis layer reads it via `agent_control_theory.load_journal(results/)`
+— **not** a result-store ETL. Per-tool cost (`attributed_cost_usd`) is an **allocation, not a
+measurement** (output-token-proportional; `attribution_method` is `OUTPUT_TOKEN_PROPORTIONAL` when
+precise, `EVEN_SPLIT` for the coarse fallback) — report it as such and filter coarse runs from the
+data alone.
+
 **Loss dimensions to track:**
 
 | Dimension | Signal | Tool |
 |-----------|--------|------|
 | _Outcome_ | _Pass rate, judge scores_ | _GrowthStoryReporter_ |
-| _Behavioral_ | _Loop amplification_ | _make_markov_analysis.py_ |
+| _Behavioral_ | _Loop amplification_ | _make_markov_analysis.py (over the canonical journal)_ |
 | _Knowledge_ | _Search state frequency_ | _Markov state distribution_ |
+| _Cost_ | _Cost-weighted V(EXPLORE), per-tool $_ | _load_journal → cost_weighted_explore (allocation)_ |
 
 **Regression criteria:** A change is a regression if any per-judge score decreases by more than _X_ across the dataset, even if the aggregate improves.
 

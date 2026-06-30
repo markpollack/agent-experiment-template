@@ -193,35 +193,49 @@ For infrastructure customization:
 
 ## Analysis Scripts
 
-After running experiments, use the Python scripts in `scripts/` to analyze results:
+### The trace source of truth: the canonical journal
+
+Every run writes a **canonical agent-journal on by default** (you wire nothing — the framework owns it). Beside each run's results sits:
+
+```
+results/<exp>/sessions/<session>/<variant>/journal/experiments/<exp>/runs/<runId>/
+  run.json        # config.{variant, itemId, itemSlug, model, session} — the join key
+  events.jsonl    # immutable execution events (LLMCallEvent, ToolCallEvent, …)
+  analysis.jsonl  # derived per-tool StepCostEvents, keyed by tool_use id
+```
+
+The analysis layer reads **this** schema — not a separate result-store ETL. The library `agent_control_theory.load_journal(results_dir)` discovers every run under `results/` and returns `(tool_uses_df, item_results_df)` with per-tool cost already joined. `make_markov_analysis.py` calls it for you.
+
+> **Cost is an allocation, not a measurement.** Per-tool cost (`attributed_cost_usd`) is total run cost split output-token-proportionally across turns (even-split within a turn, blended-model-priced) — inferred after the run, not a wire-measured per-tool charge. Each row carries its `attribution_method`: `OUTPUT_TOKEN_PROPORTIONAL` (precise) vs `EVEN_SPLIT` (coarse fallback, no per-turn tokens). Filter/down-weight `EVEN_SPLIT` from the data alone.
 
 ```bash
-# 1. Load results into parquet (run from project root)
-python scripts/load_results.py --experiment my-experiment
+# 1. Run a variant — the canonical journal is written automatically
+./mvnw compile exec:java -Dexec.args="--variant control"
 
-# 2. Generate variant comparison figures
-python scripts/make_figures.py
-
-# 3. Run Markov chain analysis (optional, requires markov-agent-analysis library)
+# 2. Markov chain analysis — reads the canonical journal via load_journal
 python scripts/make_markov_analysis.py
+
+# 3. Variant comparison figures
+python scripts/make_figures.py
 ```
+
+> `load_results.py` is the **deprecated** result-store reader — retained only for pre-journal data (it cannot recover per-tool cost). New experiments do not use it.
 
 ### Setup
 
 ```bash
 # Option A: standard venv
-./scripts/setup_venv.sh /path/to/markov-agent-analysis
+./scripts/setup_venv.sh /path/to/agent-control-theory
 
 # Option B: uv (recommended if available)
 uv venv scripts/.venv
 uv pip install -r scripts/requirements.txt
-uv pip install -e /path/to/markov-agent-analysis[all]
+uv pip install -e /path/to/agent-control-theory[all]
 ```
 
 ### Customize
 
 Each script has a `# CUSTOMIZE` section at the top:
-- `load_results.py`: Update `SCORE_MAP` with your judge class names
 - `make_markov_analysis.py`: Update `STATES` list and `classify_state()` with your domain's tool-call taxonomy
 - `make_figures.py`: Update `VARIANT_ORDER` and add domain-specific figures
 
@@ -229,9 +243,9 @@ Each script has a `# CUSTOMIZE` section at the top:
 
 | Script | Output |
 |--------|--------|
-| `load_results.py` | `data/curated/*.parquet` — 4 tables: runs, item_results, tool_uses, judge_details |
-| `make_figures.py` | `docs/figures/*.pdf + *.png` — pass rate, cost/quality, per-item breakdown |
 | `make_markov_analysis.py` | `docs/figures/*.pdf + *.png` — transition matrices, fundamental matrix, loop amplification, Sankey flows; `analysis/markov-interpretation.md` — flywheel diagnostics with intervention recommendations |
+| `make_figures.py` | `docs/figures/*.pdf + *.png` — pass rate, cost/quality, per-item breakdown |
+| `load_journal` (library) | in-memory `(tool_uses_df, item_results_df)` from the canonical journal — the ETL `make_markov_analysis.py` consumes |
 
 ## Requirements
 

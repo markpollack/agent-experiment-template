@@ -17,14 +17,18 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Dependency versions -->
-        <experiment-core.version>0.5.0</experiment-core.version>
-        <!-- 0.6.0-SNAPSHOT until agent-experiment 0.6.0 releases -->
+        <!-- First-class journal-capture feature: SNAPSHOT-first development (DESIGN A3).
+             experiment-core (slice 2, run-journal lifecycle) + journal-core/claude-code-capture
+             (slice 1, eager stepCosts + production RunRecorder + A5 schema header) are consumed
+             from locally-installed SNAPSHOTs until the single coordinated release pins them via
+             agentworks-bom 1.13.0. `./mvnw install` both upstreams to ~/.m2 first. -->
+        <experiment-core.version>0.6.0-SNAPSHOT</experiment-core.version>
         <experiment-workflow.version>0.6.0-SNAPSHOT</experiment-workflow.version>
         <agent-judge.version>0.13.0</agent-judge.version>
         <agent-client.version>0.23.0</agent-client.version>
         <agent-workflow.version>0.10.0</agent-workflow.version>
         <claude-code-sdk.version>1.4.0</claude-code-sdk.version>
-        <journal.version>1.4.0</journal.version>
+        <journal.version>1.6.0-SNAPSHOT</journal.version>
         <jackson.version>2.21.2</jackson.version>
         <snakeyaml.version>2.2</snakeyaml.version>
         <slf4j.version>2.0.13</slf4j.version>
