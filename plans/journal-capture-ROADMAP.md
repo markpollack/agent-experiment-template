@@ -192,12 +192,28 @@ experiment-core `0.6.0-SNAPSHOT` (slice 2), both installed to `~/.m2`.
 |------|----------|----------|---------|
 | 2026-06-30 | self-review (steward) | none | Acceptance met: `./mvnw test` green; on-by-default journal proven by `JournalCaptureSmokeTest`; result-store steering retired across README / scripts / templates / CLAUDE.md. No contract change surfaced (§6 #3 satisfied without new template wiring; A4 glob + A5 header confirmed on real output). Folds into the single coordinated release (A3). |
 
+## Post-slice dependency alignment (agentworks-bom 1.15.0)
+
+The template caught up to the latest suite BOM. agent-journal's slice-1 primitives ship as the
+RELEASED `journal-core` / `claude-code-capture` `1.6.0`, so those moved **off SNAPSHOT**
+(`journal.version` → `1.6.0`); `agent-client` tracked to `0.25.0` (BOM 1.15.0's Boot-4 auto-config
+registration fix — a no-op for this plain-Java CLI, taken for suite alignment); `agent-judge 0.13.0`
+/ `workflow 0.10.0` / `claude-code-sdk 1.4.0` already matched.
+
+`experiment-core` / `experiment-workflow` stay on `0.6.0-SNAPSHOT`: agent-experiment's slice-2
+`0.6.0` (the run-journal lifecycle) is on its `main` but **not released**, and the BOM still pins
+`experiment-core 0.5.0` (pre-slice-2). That is the **only** remaining SNAPSHOT surface, and by
+decision (2026-07-01) it stays until the agent-experiment `0.6.0` release is cut — which is **batched
+until all scheduled agent-experiment work is complete** (Central release overhead), not cut early.
+Verified: `./mvnw dependency:tree` resolves journal `1.6.0` + agent-client `0.25.0` (releases), no
+SNAPSHOT leak beyond experiment-core/-workflow; `./mvnw test` green.
+
 ## Conventions
 
 - **Every step** ends green (`./mvnw test`) and updates this file's checkboxes.
 - **Learnings** are a primary artifact (`plans/learnings/`).
-- **SNAPSHOT-first** (DESIGN §9/A3): no per-component release mid-feature; the pom switches from
-  SNAPSHOT to BOM-managed at the single coordinated release.
+- **SNAPSHOT-first** (DESIGN §9/A3): no per-component release mid-feature; the pom de-SNAPSHOTs each
+  component as its release lands in the BOM (journal done; experiment-core pending).
 - The canonical `journal-capture-DESIGN.md` is **READ-ONLY** here; contract changes are surfaced to
   the owner, not edited in.
 
@@ -206,3 +222,4 @@ experiment-core `0.6.0-SNAPSHOT` (slice 2), both installed to `~/.m2`.
 | Timestamp | Change | Trigger |
 |-----------|--------|---------|
 | 2026-06-30T12:57-04:00 | Initial roadmap — S0–S4 done; acceptance met | Slice 3 implemented this session |
+| 2026-07-01T13:41-04:00 | Catch up to agentworks-bom 1.15.0: journal → released 1.6.0, agent-client → 0.25.0; experiment-core/-workflow stay 0.6.0-SNAPSHOT (agent-experiment 0.6.0 release batched until its scheduled work is complete) | New BOM available; general template↔agent-experiment sync |
