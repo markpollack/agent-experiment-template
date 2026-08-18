@@ -26,8 +26,6 @@ import io.github.markpollack.judge.JudgeWithMetadata;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.jury.TierPolicy;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -175,11 +173,7 @@ class JournalCaptureSmokeTest {
 
 		@Override
 		public Judgment judge(JudgmentContext context) {
-			return Judgment.builder()
-				.score(new BooleanScore(true))
-				.status(JudgmentStatus.PASS)
-				.reasoning("smoke")
-				.build();
+			return Judgment.pass("smoke");
 		}
 
 		@Override

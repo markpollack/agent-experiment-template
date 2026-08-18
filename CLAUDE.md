@@ -74,10 +74,10 @@ When in optimize mode, follow the flywheel cycle strictly: don't skip DIAGNOSE (
 
 ## Dependencies
 
-- `experiment-core` (ai.tuvium) — ExperimentRunner, ComparisonEngine, ResultStore, SessionStore
-- `agent-judge-core` + `agent-judge-exec` — Judge, Jury, CascadedJury, BuildSuccessJudge
-- `spring-ai-agent-client` + `spring-ai-claude-agent` — Single-phase agent invocation
-- `claude-code-sdk` — Two-phase session support (ClaudeSyncClient)
-- `journal-core` + `claude-code-capture` — Phase capture and session log parsing
-- `workflow-journal` — Journal integration for workflow step tracing
+- `experiment-core` + `experiment-workflow` 0.6.0 — experiment lifecycle and workflow adapters
+- `agent-judge-core` + `agent-judge-exec` 0.14.0 — Judge, Jury, CascadedJury, BuildSuccessJudge
+- `agent-client-core` + `agent-claude` 0.26.0 — single-phase agent invocation
+- `claude-code-sdk` 1.4.0 — two-phase session support (ClaudeSyncClient)
+- `journal-core` + `claude-code-capture` 1.7.0 — phase capture and session log parsing
+- `workflow-journal` 0.10.0 — journal integration for workflow step tracing
 - `javaparser-core` — AST analysis for custom judges

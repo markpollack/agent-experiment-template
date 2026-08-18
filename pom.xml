@@ -24,30 +24,20 @@
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <!-- Dependency versions — aligned to agentworks-bom 1.15.0 (first-class journal-capture).
-             agentworks-bom shipped agent-journal's slice-1 primitives (eager stepCosts, production
-             RunRecorder, A5 schema header) as the RELEASED journal-core/claude-code-capture 1.6.0 —
-             off SNAPSHOT. agent-judge 0.13.0, workflow 0.10.0, and claude-code-sdk 1.4.0 match the
-             BOM; agent-client is 0.25.0 (BOM 1.15.0: Boot-4 auto-config registration fix — a no-op
-             for this plain-Java CLI, tracked for suite alignment).
-
-             STILL SNAPSHOT: experiment-core + experiment-workflow 0.6.0-SNAPSHOT. The on-by-default
-             run-journal lifecycle lives in agent-experiment's slice-2 0.6.0, which is on its main but
-             NOT yet released — agentworks-bom 1.15.0 still pins experiment-core 0.5.0 (pre-slice-2,
-             no journal lifecycle). Build against the locally-installed 0.6.0-SNAPSHOT (DESIGN A3);
-             move to the released 0.6.0 at the coordinated agent-experiment release (batched once its
-             scheduled work is complete — do not cut it early). -->
-        <experiment-core.version>0.6.0-SNAPSHOT</experiment-core.version>
-        <experiment-workflow.version>0.6.0-SNAPSHOT</experiment-workflow.version>
-        <agent-judge.version>0.13.0</agent-judge.version>
-        <agent-client.version>0.25.0</agent-client.version>
+        <!-- Explicit released coordinates for the public Agent Experiment 0.6.0 integration line.
+             The template does not import the suite BOM; keep these pins coherent for standalone
+             Central-only resolution. -->
+        <experiment-core.version>0.6.0</experiment-core.version>
+        <experiment-workflow.version>0.6.0</experiment-workflow.version>
+        <agent-judge.version>0.14.0</agent-judge.version>
+        <agent-client.version>0.26.0</agent-client.version>
         <agent-workflow.version>0.10.0</agent-workflow.version>
         <claude-code-sdk.version>1.4.0</claude-code-sdk.version>
-        <journal.version>1.6.0</journal.version>
-        <jackson.version>2.21.2</jackson.version>
+        <journal.version>1.7.0</journal.version>
+        <jackson.version>2.21.6</jackson.version>
         <snakeyaml.version>2.2</snakeyaml.version>
         <slf4j.version>2.0.13</slf4j.version>
-        <logback.version>1.5.6</logback.version>
+        <logback.version>1.5.34</logback.version>
         <junit.version>5.10.1</junit.version>
         <assertj.version>3.24.2</assertj.version>
     </properties>
