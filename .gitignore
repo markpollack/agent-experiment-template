@@ -14,3 +14,10 @@ target/
 .DS_Store
 results/runs/
 dataset/workspaces/
+
+# Planning lives in the private steward: markpollack/agent-experiment-template-steward
+# The three plans/*-TEMPLATE.md files are the product and stay tracked.
+plans/inbox/
+plans/learnings/
+plans/status-*.md
+plans/journal-capture-*.md
