@@ -8,7 +8,13 @@
 # The [all] extra pulls scipy/plotly/kaleido/networkx and numpy/matplotlib transitively,
 # so they are intentionally NOT pinned here (pinning them = the copy anti-pattern).
 # Back-compat: the package also exposes a `markov_agent_analysis` shim, but new code
-# should import `agent_control_theory`.
+# should import `agent_control_theory`. This template imports the canonical name only.
+#
+# MINIMUM VERSION: agent-control-theory >= 0.3.0. Below that, run_second_order_test reports
+# "SIGNIFICANT SECOND-ORDER DEPENDENCE" on data from a perfect first-order chain, and
+# run_stationarity_test is biased toward its own NON-STATIONARY verdict. The template cannot
+# correct either rule -- they are the library's -- so scripts/tests/test_validate_markov.py
+# fails fast if an older library is installed rather than letting a wrong verdict through.
 
 # Direct deps of the LOCAL driver glue only (ETL + stub figures) — not provided by the library:
 duckdb>=0.9

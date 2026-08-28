@@ -1,0 +1,135 @@
+"""Ground-truth tests for the verdicts `validate_markov.py` renders.
+
+The template previously shipped `validate_markov.py` with **no test of any kind**. It renders
+human-readable judgements, and this programme's evidence is that a verdict function is exactly
+where a wrong answer fails to announce itself: `validation.py` shipped two wrong verdict rules and
+nobody noticed until real data contradicted the output. A template propagates that blind spot into
+every experiment scaffolded from it, which is why these live here rather than only upstream.
+
+Scope, deliberately narrow. The two verdict *rules* belong to `agent_control_theory` and are tested
+there against ground truth. What the template can and must own is different:
+
+  1. that its imports resolve to the canonical package rather than the deprecated shim, so the
+     migration cannot silently regress; and
+  2. that the *installed* library is new enough to contain the corrected rules — because the
+     template cannot fix them, and an older library would silently reintroduce them while every
+     other test still passed.
+
+(3) is end-to-end ground truth through this template's own taxonomy: known-benign data in, benign
+verdict out.
+
+**Which of these actually discriminate, verified rather than assumed.** Run against a library
+checkout predating the corrections, (2) and (3) FAIL and (1) and (4) PASS. So (2) and (3) are real
+gates; (4) is a benign-behaviour regression check, not a fix detector — the old stationarity rule
+does not fire on this data shape at any sample size tried, and the gate that does discriminate for
+it lives in the library's own suite. (4) is kept because it would still catch a future regression
+that calls homogeneous data non-stationary; it is labelled so nobody mistakes it for proof the
+stationarity fix is installed. Test (2) is what covers that.
+
+Run:  pytest scripts/tests/test_validate_markov.py
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from agent_control_theory.validation import run_second_order_test, run_stationarity_test
+
+# This template's taxonomy. Kept local so the test does not depend on the analysis driver
+# importing cleanly, which needs duckdb and a results/ tree.
+STATES = ["EXPLORE", "READ_KB", "BUILD", "FIX", "WRITE", "JAR", "TEST", "PLAN", "DONE"]
+N = len(STATES)
+
+
+def _first_order_matrix(seed: int = 0) -> np.ndarray:
+    """A realistic first-order chain: heavy self-loops and a long thin tail.
+
+    The thin tail is the point. It produces many sparsely-observed (prev, curr) pairs, and the
+    plug-in KL estimator's bias on those pairs is what drove the old, wrong verdict.
+    """
+    rng = np.random.default_rng(seed)
+    P = np.zeros((N, N))
+    for i in range(N):
+        row = rng.dirichlet(np.full(N, 0.35))
+        row[i] += 2.5 if i == 0 else 0.8
+        P[i] = row / row.sum()
+    return P
+
+
+def _simulate_first_order(P, n_traces, length, seed, variant="a") -> pd.DataFrame:
+    """Traces from a PERFECT first-order chain — by construction, order 1 is adequate."""
+    rng = np.random.default_rng(seed)
+    rows = []
+    for t in range(n_traces):
+        s = 0
+        for k in range(length):
+            rows.append({"variant": variant, "trace_id": f"{variant}-t{t}", "item_id": "item",
+                         "global_seq": k, "semantic_state": STATES[s]})
+            s = int(rng.choice(N, p=P[s]))
+    return pd.DataFrame(rows)
+
+
+@pytest.fixture(scope="module")
+def first_order_traces() -> pd.DataFrame:
+    return _simulate_first_order(_first_order_matrix(), n_traces=10, length=100, seed=1)
+
+
+def test_imports_resolve_to_the_canonical_package_not_the_shim():
+    """`markov_agent_analysis` is a back-compat shim that aliases the real modules.
+
+    Importing through it works, so a regression here is invisible at runtime — the shim will keep
+    resolving until the library drops it, and then every scaffolded experiment breaks at once.
+    """
+    import agent_control_theory.validation as canonical
+
+    assert run_second_order_test.__module__.startswith("agent_control_theory")
+    assert run_stationarity_test.__module__.startswith("agent_control_theory")
+    assert canonical.run_second_order_test is run_second_order_test
+
+
+def test_installed_library_contains_the_corrected_second_order_rule(first_order_traces):
+    """The template cannot fix the verdict rules; it can refuse to run against a library without them.
+
+    `mean_kl_corrected` is the observable signature of the bias correction. A library predating it
+    returns the old uncorrected shape, and the end-to-end tests below could then pass or fail for
+    reasons unrelated to this template.
+    """
+    result = run_second_order_test(first_order_traces, STATES)
+    assert "mean_kl_corrected" in result, (
+        "installed agent-control-theory predates the second-order bias correction; "
+        "reinstall the library before trusting any verdict this template renders"
+    )
+    assert "lr_pvalue" in result
+
+
+def test_perfect_first_order_data_is_not_called_second_order(first_order_traces):
+    """Ground truth: the data IS first-order, so the verdict must not claim otherwise.
+
+    The pre-fix rule returned "SIGNIFICANT SECOND-ORDER DEPENDENCE" on exactly this input, at every
+    sample size tried — the alarming answer on data containing nothing to be alarmed about.
+    """
+    result = run_second_order_test(first_order_traces, STATES)
+    assert "SECOND-ORDER" not in result["verdict"].upper() or "NO" in result["verdict"].upper(), (
+        f"first-order data produced verdict {result['verdict']!r} "
+        f"(lr_pvalue={result.get('lr_pvalue')!r})"
+    )
+
+
+def test_two_samples_of_one_homogeneous_chain_are_called_stationary():
+    """Ground truth: both variants are drawn from the SAME chain, so there is nothing to detect.
+
+    NOT a fix detector. Verified against a pre-correction library: this passes there too, because
+    the old rule's Frobenius trigger does not fire on this data shape at any sample size tried
+    (8x80 through 30x200). The discriminating stationarity gates live in the library's own suite.
+    Kept as a regression check — it would still catch a future rule that calls homogeneous data
+    non-stationary.
+    """
+    P = _first_order_matrix()
+    a = _simulate_first_order(P, n_traces=8, length=80, seed=2, variant="a")
+    b = _simulate_first_order(P, n_traces=8, length=80, seed=3, variant="b")
+    result = run_stationarity_test(pd.concat([a, b], ignore_index=True), STATES)
+    assert "NON-STATIONARY" not in result["verdict"].upper(), (
+        f"one homogeneous chain produced verdict {result['verdict']!r}"
+    )

@@ -21,9 +21,9 @@ import duckdb
 import numpy as np
 import pandas as pd
 
-from markov_agent_analysis.transitions import apply_classify
-from markov_agent_analysis.fundamental import build_absorbing_chain_from_traces, compute_fundamental_matrix
-from markov_agent_analysis.validation import run_second_order_test, run_stationarity_test
+from agent_control_theory.transitions import apply_classify
+from agent_control_theory.fundamental import build_absorbing_chain_from_traces, compute_fundamental_matrix
+from agent_control_theory.validation import run_second_order_test, run_stationarity_test
 
 # ---------------------------------------------------------------------------
 # Paths

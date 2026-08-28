@@ -42,6 +42,7 @@ from pathlib import Path
 
 import duckdb
 import pandas as pd
+from agent_control_theory.loaders import NO_TRUNCATION, tool_target
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -172,7 +173,14 @@ def extract_tool_uses(results: dict[str, dict],
                 phase_name = phase.get("phaseName", "unknown")
                 for i, tool in enumerate(phase.get("toolUses", [])):
                     tool_input = tool.get("input", {})
-                    target = _tool_target(tool["name"], tool_input)
+                    # CT1: pass NO_TRUNCATION explicitly. The library's default preserves the
+                    # historical per-tool widths for reproducibility, so importing tool_target
+                    # without this argument would reproduce the 80-char slice rather than fix it.
+                    # For Bash in particular the discriminating text routinely sits past
+                    # character 80, and truncating it collapsed 28% of a measured trajectory.
+                    target = tool_target(
+                        tool["name"], tool_input, max_width=NO_TRUNCATION
+                    )
                     row = {
                         "run_id": run_id,
                         "variant": variant,
@@ -190,27 +198,6 @@ def extract_tool_uses(results: dict[str, dict],
                     rows.append(row)
                     global_seq += 1
     return rows
-
-
-def _tool_target(tool_name: str, tool_input: dict) -> str:
-    """Extract a short human-readable target from tool input."""
-    if tool_name in ("Read", "Write", "Edit", "Glob"):
-        path = tool_input.get("file_path", tool_input.get("path", ""))
-        parts = path.rstrip("/").split("/")
-        return "/".join(parts[-2:]) if len(parts) > 1 else path
-    if tool_name == "Agent":
-        subagent_type = tool_input.get("subagent_type", "")
-        description = tool_input.get("description", "")
-        return f"{subagent_type}:{description}"[:80]
-    if tool_name == "Bash":
-        cmd = tool_input.get("command", "")
-        return cmd[:80]
-    if tool_name == "Grep":
-        pattern = tool_input.get("pattern", "")
-        return f"/{pattern}/"[:60]
-    if tool_name == "TodoWrite":
-        return "todos"
-    return ""
 
 
 def extract_judge_details(results: dict[str, dict]) -> list[dict]:
