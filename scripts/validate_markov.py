@@ -24,6 +24,12 @@ import pandas as pd
 from agent_control_theory.transitions import apply_classify
 from agent_control_theory.fundamental import build_absorbing_chain_from_traces, compute_fundamental_matrix
 from agent_control_theory.validation import run_second_order_test, run_stationarity_test
+from agent_control_theory.comparability import (
+    assert_start_states_comparable,
+    check_v_matches_observed,
+    empirical_start_distribution,
+)
+from agent_control_theory.effects import effect_with_ci
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -72,76 +78,72 @@ def _trace_key_col(classified: pd.DataFrame) -> str:
     return "trace_id" if "trace_id" in classified.columns else "item_id"
 
 
-def start_state_distribution(df: pd.DataFrame, seq_col: str = "global_seq") -> dict[str, float]:
-    """Which state each trajectory actually STARTS in, as a distribution over states.
+def run_length_effects(classified: pd.DataFrame) -> list:
+    """THE DEFAULT REPORT: mean trajectory length per arm, and the effect between arms with an interval.
 
-    CT7. `V` is a vector, and `N[0]` is the expected step count *starting from STATES[0]*. Reading
-    it as "the" trajectory length assumes every trajectory starts there. In both audited
-    experiments they did not, and that -- not the grouping defect -- is what killed two published
-    headlines: on the v4 data it flips the sign.
+    Computed by counting. No chain, no fundamental matrix, no row to read wrongly.
+
+    At unit cost ``V(s0)`` is *identically* mean trajectory length — the verification block on the
+    audited data shows 75.7/75.7 and 54.7/54.7 — so "V fell 27.7%" and "mean run length fell from
+    75.7 to 54.7 steps" are the same statement, and only one of them needs a fundamental matrix.
+    The machinery is decorative for this quantity, and CT7 made that easier to miss by giving the
+    comparison a guard to pass.
+
+    **The interval goes on the EFFECT, not on each arm's mean**, because the effect is what gets
+    quoted. An arm-wise error bar does not tell you whether the difference between two arms is
+    distinguishable from zero; that is the number a headline rests on.
+
+    Three reasons this is a report and not a verdict, none of which a guard can fix: steps are not
+    cost ($/step varies systematically by variant, and step-vs-dollar rankings invert); the levers
+    change the plant, so arms are different systems rather than one system under two settings; and
+    at realistic replication the detectable effect is large.
     """
-    tkey = _trace_key_col(df)
-    firsts = df.sort_values(seq_col).groupby(tkey)["semantic_state"].first()
-    counts = firsts.value_counts()
-    total = int(counts.sum())
-    return {state: counts[state] / total for state in counts.index} if total else {}
+    tkey = _trace_key_col(classified)
+    per_arm = {
+        variant: g.groupby(tkey).size().astype(float).tolist()
+        for variant, g in classified.groupby("variant")
+    }
+    arms = sorted(per_arm)
+    effects = []
+    for i, control in enumerate(arms):
+        for treated in arms[i + 1:]:
+            if len(per_arm[control]) < 2 or len(per_arm[treated]) < 2:
+                # An interval would be undefined. Reporting a point estimate here is the failure
+                # this whole report exists to prevent, so the pair is skipped and said so.
+                effects.append({"label": f"{treated} vs {control}", "effect": None,
+                                "note": "fewer than 2 trajectories in an arm; no interval is definable"})
+                continue
+            e = effect_with_ci(per_arm[treated], per_arm[control], label=f"{treated} vs {control}")
+            significant = not (e.ci_low <= 0.0 <= e.ci_high)
+            effects.append({
+                "label": e.label,
+                "control_mean_steps": round(e.control_mean, 1),
+                "treated_mean_steps": round(e.treated_mean, 1),
+                "delta_steps": round(e.delta, 1),
+                "ci95": [round(e.ci_low, 1), round(e.ci_high, 1)],
+                "p": round(e.p, 3),
+                "detected": significant,
+                "claim": (f"{e.delta:+.1f} steps (95% CI {e.ci_low:+.1f} to {e.ci_high:+.1f}, p={e.p:.3f})"
+                          if significant
+                          else f"NO DETECTED EFFECT on run length "
+                               f"({e.delta:+.1f} steps, 95% CI {e.ci_low:+.1f} to {e.ci_high:+.1f}, "
+                               f"p={e.p:.3f}) — not the same as no effect"),
+            })
+    return effects
 
 
-def start_state_index(df: pd.DataFrame) -> int:
-    """Row of `N` that `V` must be read from for this data — the state trajectories actually start in.
+def start_state_index(df: pd.DataFrame, variant: str) -> int:
+    """Row of `N` that `V` must be read from — the state these traces actually start in.
 
-    `N[0]` is expected steps from STATES[0]. Reading it unconditionally is CT7.
+    `N[0]` is expected steps from STATES[0]; reading it unconditionally is CT7. The distribution
+    itself comes from the library, so a correction there reaches this template. Defining a local
+    copy is what let CT1 survive a library fix.
     """
-    dist = start_state_distribution(df)
+    dist = empirical_start_distribution(df, variant, item_id_col=_trace_key_col(df))
     if not dist:
         return 0
     start_state = max(dist, key=dist.get)
     return STATES.index(start_state) if start_state in STATES else 0
-
-
-def assert_v_matches_observed(N, df: pd.DataFrame, variant: str, tol: float = 0.5) -> None:
-    """The identity that catches CT6 and CT7 together.
-
-    At unit cost, expected steps from the start state must equal the mean observed trajectory
-    length. If it does not, either the trajectories were concatenated (CT6) or `V` is being read
-    from the wrong row (CT7). One line, and it fails loudly rather than producing a plausible
-    number.
-    """
-    dist = start_state_distribution(df)
-    if not dist:
-        return
-    start_index = start_state_index(df)
-    start_state = STATES[start_index]
-    v_at_start = float(N[start_index].sum())
-    tkey = _trace_key_col(df)
-    mean_len = float(df.groupby(tkey).size().mean())
-    if abs(v_at_start - mean_len) >= max(tol, 0.05 * mean_len):
-        raise AssertionError(
-            f"{variant}: V from start state {start_state!r} is {v_at_start:.1f} but mean observed "
-            f"trajectory length is {mean_len:.1f}. At unit cost these are the same number; they are "
-            f"not, so either trajectories were concatenated or V is being read from the wrong row."
-        )
-
-
-def refuse_incomparable_start_states(per_variant: dict[str, dict[str, float]], tol: float = 0.10) -> None:
-    """Do not difference V across variants whose start-state distributions differ.
-
-    The notice's second half, enforced rather than documented -- a rule nothing checks is a
-    suggestion. Compare each arm from its own s0, or do not compare.
-    """
-    variants = sorted(per_variant)
-    for i, a in enumerate(variants):
-        for b in variants[i + 1:]:
-            states = set(per_variant[a]) | set(per_variant[b])
-            drift = {s: abs(per_variant[a].get(s, 0.0) - per_variant[b].get(s, 0.0)) for s in states}
-            worst = max(drift, key=drift.get)
-            if drift[worst] > tol:
-                raise AssertionError(
-                    f"start-state distributions differ between {a!r} and {b!r} "
-                    f"(state {worst!r}: {per_variant[a].get(worst, 0.0):.2f} vs "
-                    f"{per_variant[b].get(worst, 0.0):.2f}). Differencing V across these arms is not "
-                    f"meaningful -- compare each arm from its own s0, or do not compare."
-                )
 
 
 def predicted_vs_actual(classified: pd.DataFrame, items: pd.DataFrame) -> dict:
@@ -155,8 +157,9 @@ def predicted_vs_actual(classified: pd.DataFrame, items: pd.DataFrame) -> dict:
     has_multi_run = tkey == "trace_id"
     rows = []
 
-    start_states = {v: start_state_distribution(g) for v, g in classified.groupby("variant")}
-    refuse_incomparable_start_states(start_states)
+    # Do not difference across arms whose start-state distributions differ. Library-owned.
+    assert_start_states_comparable(classified, sorted(classified["variant"].unique()),
+                                   item_id_col=_trace_key_col(classified))
 
     for variant, vdf in classified.groupby("variant"):
         actual_total = len(vdf)
@@ -188,7 +191,7 @@ def predicted_vs_actual(classified: pd.DataFrame, items: pd.DataFrame) -> dict:
                 )
                 N_train = compute_fundamental_matrix(Q_train)
                 # CT7: read V from the state these traces actually start in, not row 0.
-                predicted = float(N_train[start_state_index(train_cls)].sum())
+                predicted = float(N_train[start_state_index(train_cls, variant)].sum())
                 actual = len(test_cls)
                 cv_errors.append({"held_out": int(held_out), "predicted": round(predicted, 1),
                                    "actual": actual, "delta": round(actual - predicted, 1)})
@@ -203,6 +206,7 @@ def predicted_vs_actual(classified: pd.DataFrame, items: pd.DataFrame) -> dict:
                 "cv_folds": cv_errors,
                 "mode": "k-fold CV (out-of-sample)",
                 "state_predicted": {},
+                "composition_share": {},
                 "state_actual": vdf.groupby("semantic_state").size().to_dict(),
             })
         else:
@@ -215,12 +219,23 @@ def predicted_vs_actual(classified: pd.DataFrame, items: pd.DataFrame) -> dict:
                 item_id_col=tkey,
             )
             N = compute_fundamental_matrix(Q)
-            assert_v_matches_observed(N, vdf, variant)
+            # The library owns this identity; a correction there reaches us.
+            check_v_matches_observed(vdf, variant, N.sum(axis=1), STATES,
+                                     item_id_col=_trace_key_col(vdf))
             # CT7: V is a vector. Read the row for the state these traces actually start in.
-            s0 = start_state_index(vdf)
+            s0 = start_state_index(vdf, variant)
             predicted_per_item = float(N[s0].sum())
+            # What the chain earns: expected VISITS per state (where effort goes) and composition
+            # share (the only quantity in the audit that predicted anything). V(s0) is not a
+            # headline -- at unit cost it is identically mean trajectory length, which
+            # run_length_effects() reports by counting, with an interval on the effect.
             state_predicted = {STATES[j]: float(N[s0, j]) for j in range(N_STATES)}
+            observed_counts = vdf["semantic_state"].value_counts()
+            observed_total = int(observed_counts.sum()) or 1
+            composition_share = {st: round(float(observed_counts.get(st, 0)) / observed_total, 4)
+                                 for st in STATES}
             rows.append({
+                "composition_share": composition_share,
                 "variant": variant,
                 "n_runs": n_runs,
                 "actual_per_item": round(actual_total / n_runs, 1),

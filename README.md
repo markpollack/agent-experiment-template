@@ -253,3 +253,37 @@ Each script has a `# CUSTOMIZE` section at the top:
 - Maven (wrapper included)
 - `ANTHROPIC_API_KEY` environment variable
 - Python 3.11+ (for analysis scripts)
+
+### Why `V` is not the default run-length metric
+
+`scripts/validate_markov.py` reports **mean trajectory length per arm, with a confidence interval on
+the effect between arms**, computed by counting. It does *not* headline `V(s0)` from the fundamental
+matrix.
+
+The reason is worth stating rather than implying, because the next person will otherwise add it back
+— correctly implemented, guards and all — and be wrong again: **the guard catches a wrong row; it
+does not catch a wrong question.** The machinery being right is not the same as the question being
+right.
+
+At unit cost `V(s0)` is *identically* mean trajectory length. On the audited data the two agree to
+the decimal (75.7/75.7, 54.7/54.7), so "V fell 27.7%" and "mean run length fell from 75.7 to 54.7
+steps" are the same statement — and only one of them needs an absorbing chain. Three further reasons
+not to difference `V` across arms, none of which a guard can fix: steps are not cost, and $/step
+varies systematically by variant to the point where step-vs-dollar rankings invert; the levers change
+the plant, so the arms are different systems rather than one system under two settings; and at
+realistic replication the detectable effect is large, so a difference that looks big may be
+undetectable.
+
+The chain is **kept for composition and regime signal — directional evidence at n=28 and n=7, item-
+and model-confounded respectively; the effect a mean cannot give, not yet an established one.** It
+reports composition share and expected visits `N[s0,:]` — where effort goes, which a mean cannot tell
+you. Stated that way deliberately: these are the strongest surviving claims in the programme and
+therefore the easiest to quote flat, which is the mechanism that has already withdrawn five others.
+
+The comparability guards remain and are imported from `agent_control_theory.comparability` rather
+than copied, so a correction there reaches this template — a local copy that was right once is how
+the truncation defect survived a library fix. They are exercised by
+`scripts/tests/test_validate_markov.py` even though the default path no longer calls them, because
+an imported-and-never-invoked guard rots silently. `V` returns non-vacuously the moment per-state
+cost is not 1: `V = N·c` is then expected remaining *cost* rather than steps. This is "not yet", not
+"never", and the guards are what will make it safe when it lands.

@@ -165,36 +165,103 @@ def _load_validate_markov():
     return mod
 
 
-def test_start_state_distribution_reports_where_traces_actually_start():
+def test_start_state_index_points_at_where_traces_actually_start():
+    """The row V must be read from. Backed by agent_control_theory.comparability, not a local copy."""
     vm = _load_validate_markov()
-    dist = vm.start_state_distribution(_traces("READ_KB", 5, 10, "a"))
-    assert dist["READ_KB"] == pytest.approx(1.0)
+    df = _traces("READ_KB", 5, 10, "a")
+    assert vm.start_state_index(df, "a") == vm.STATES.index("READ_KB")
+    assert vm.start_state_index(df, "a") != 0, "STATES[0] is EXPLORE; reading row 0 here is CT7"
 
 
 def test_differencing_across_mismatched_start_states_is_refused():
-    """THE CT7 GATE. Two arms starting in different states must not be compared."""
-    vm = _load_validate_markov()
-    a = vm.start_state_distribution(_traces("EXPLORE", 5, 10, "a"))
-    b = vm.start_state_distribution(_traces("READ_KB", 5, 10, "b"))
-    with pytest.raises(AssertionError, match="start-state distributions differ"):
-        vm.refuse_incomparable_start_states({"a": a, "b": b})
+    """THE CT7 GATE, now enforced by the library so a correction there reaches this template."""
+    from agent_control_theory.comparability import assert_start_states_comparable
+    df = pd.concat([_traces("EXPLORE", 5, 10, "a"), _traces("READ_KB", 5, 10, "b")],
+                   ignore_index=True)
+    with pytest.raises(AssertionError):
+        assert_start_states_comparable(df, ["a", "b"], item_id_col="trace_id")
 
 
 def test_matched_start_states_are_permitted():
     """The guard must not simply refuse everything -- that would be its own kind of theatre."""
+    from agent_control_theory.comparability import assert_start_states_comparable
+    df = pd.concat([_traces("EXPLORE", 5, 10, "a"), _traces("EXPLORE", 5, 12, "b")],
+                   ignore_index=True)
+    assert_start_states_comparable(df, ["a", "b"], item_id_col="trace_id")
+
+
+def test_no_local_copies_of_library_guards():
+    """The CT1 lesson applied to CT7's own fix: import the guards, do not redefine them.
+
+    A local copy that was right once is how CT1 survived a library fix. If these are defined here
+    again, a correction in agent_control_theory will not reach this template.
+    """
+    import pathlib
+    src = (pathlib.Path(__file__).resolve().parent.parent / "validate_markov.py").read_text()
+    for banned in ("def check_v_matches_observed", "def assert_start_states_comparable",
+                   "def empirical_start_distribution", "def effect_with_ci"):
+        assert banned not in src, f"{banned} is redefined locally; import it instead"
+    assert "from agent_control_theory.comparability import" in src
+
+
+# ---------------------------------------------------------------------------
+# The default report: counting, with the interval on the EFFECT
+# ---------------------------------------------------------------------------
+
+def _arm(variant, lengths):
+    rows = []
+    for t, length in enumerate(lengths):
+        for k in range(length):
+            rows.append({"variant": variant, "trace_id": f"{variant}-t{t}", "item_id": "item",
+                         "global_seq": k, "semantic_state": "EXPLORE" if k == 0 else "BUILD"})
+    return rows
+
+
+def test_a_noisy_effect_is_reported_as_not_detected():
+    """THE GATE on the interval. A CI that never crosses zero on real-shaped data is theatre."""
     vm = _load_validate_markov()
-    a = vm.start_state_distribution(_traces("EXPLORE", 5, 10, "a"))
-    b = vm.start_state_distribution(_traces("EXPLORE", 5, 12, "b"))
-    vm.refuse_incomparable_start_states({"a": a, "b": b})
+    df = pd.DataFrame(_arm("simple", [55, 62, 69]) + _arm("handoff", [44, 51, 59]))
+    effect = vm.run_length_effects(df)[0]
+    assert effect["detected"] is False
+    assert "NO DETECTED EFFECT" in effect["claim"]
+    assert "not the same as no effect" in effect["claim"]
 
 
-def test_v_identity_fails_when_v_is_read_from_the_wrong_row():
-    """At unit cost V from the true start state equals mean trajectory length. Here it cannot."""
+def test_a_large_tight_effect_is_still_detected():
+    """And it must not refuse everything, or it is theatre in the other direction."""
+    vm = _load_validate_markov()
+    df = pd.DataFrame(_arm("a", [100, 101, 99, 100]) + _arm("b", [40, 41, 39, 40]))
+    effect = vm.run_length_effects(df)[0]
+    assert effect["detected"] is True
+
+
+def test_a_single_trajectory_arm_yields_no_interval_rather_than_a_point_estimate():
+    vm = _load_validate_markov()
+    df = pd.DataFrame(_arm("a", [50]) + _arm("b", [40]))
+    effect = vm.run_length_effects(df)[0]
+    assert effect["effect"] is None
+    assert "no interval is definable" in effect["note"]
+
+def test_v_identity_guard_still_fires_on_a_wrong_row():
+    """Kept live deliberately: the default report no longer computes V, so nothing else calls this.
+
+    An imported-and-never-invoked guard rots silently. V returns the moment per-state cost is not 1
+    -- V = N.c is then expected remaining COST rather than steps -- and on that day someone needs to
+    know these still work. This test is what keeps them exercised in between.
+    """
+    from agent_control_theory.comparability import check_v_matches_observed
     vm = _load_validate_markov()
     df = _traces("READ_KB", 5, 10, "a")
-    n_states = len(vm.STATES)
-    # A fundamental matrix whose READ_KB row claims far more steps than were observed.
-    N = np.zeros((n_states, n_states))
-    N[vm.STATES.index("READ_KB"), :] = 99.0
-    with pytest.raises(AssertionError, match="mean observed"):
-        vm.assert_v_matches_observed(N, df, "a")
+    # V claiming far more steps from the true start state than were observed.
+    v_per_state = np.full(len(vm.STATES), 99.0)
+    with pytest.raises(AssertionError):
+        check_v_matches_observed(df, "a", v_per_state, vm.STATES, item_id_col="trace_id")
+
+
+def test_v_identity_guard_passes_when_v_matches_observation():
+    """And it must not fire on correct data, or it is theatre in the other direction."""
+    from agent_control_theory.comparability import check_v_matches_observed
+    vm = _load_validate_markov()
+    df = _traces("READ_KB", 5, 10, "a")
+    v_per_state = np.full(len(vm.STATES), 10.0)  # matches the observed mean length
+    check_v_matches_observed(df, "a", v_per_state, vm.STATES, item_id_col="trace_id")
