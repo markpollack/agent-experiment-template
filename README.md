@@ -287,3 +287,29 @@ the truncation defect survived a library fix. They are exercised by
 an imported-and-never-invoked guard rots silently. `V` returns non-vacuously the moment per-state
 cost is not 1: `V = N·c` is then expected remaining *cost* rather than steps. This is "not yet", not
 "never", and the guards are what will make it safe when it lands.
+
+### Declare what a sweep can detect, before spending the runs
+
+```bash
+python scripts/preflight_power.py sweep-design.json   # 0 adequate · 1 underpowered · 2 undeclared
+```
+
+An experimenter spends twelve runs and only then learns the design could never have detected the
+effect they were after. That is what this refuses. See `sweep-design.example.json`.
+
+The check reports the **minimum detectable effect** at 80% power, which is stricter than the
+half-width of the confidence interval — an effect exactly at the interval's edge has roughly even
+odds of being called undetected. Both are available in `agent_control_theory.effects`; this uses
+the stricter one on purpose, so "adequate" means adequate rather than borderline.
+
+Three things it is built to do, each paired with its opposite so the check cannot be theatre: it
+**refuses** an underpowered design *and names the replicates required*; it **passes** an adequate
+one; and it makes **UNDECLARED** loud rather than silently equivalent to declaring. σ has to come
+from somewhere and every verdict carries which — `PRIOR_SWEEP` (strongest, unavailable the first
+time), `PILOT` (accurate, costs runs to decide whether to spend runs), or `ASSUMED` (always
+available, honest only because the number is printed). A power claim that can be quoted without its
+σ source is worth no more than an undeclared sweep.
+
+Declaring the factors is not bookkeeping: a main effect in a factorial pools every cell at each
+level, so the same replicate count buys more power once the design is stated. A flat sweep is a
+design with no factors, so nothing needs migrating.

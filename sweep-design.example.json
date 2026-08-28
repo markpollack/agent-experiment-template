@@ -1,0 +1,26 @@
+{
+  "_comment": "Declare what this sweep intends to detect BEFORE running it. Check with: python scripts/preflight_power.py sweep-design.json",
+
+  "response": "run_length_steps",
+
+  "factors": {
+    "prompt":  ["simple", "hardened"],
+    "handoff": ["on", "off"]
+  },
+
+  "replicates": 3,
+
+  "targetEffect": {
+    "value": 19.0,
+    "unit": "percent",
+    "baseline": 62.0,
+    "_comment": "A percentage is not an effect size without the mean it is a percentage of."
+  },
+
+  "sigmaSource": {
+    "kind": "PRIOR_SWEEP",
+    "value": 11.0,
+    "reference": "pooled within-cell sigma from the previous sweep's replicated cells",
+    "_comment": "PRIOR_SWEEP strongest but unavailable first time; PILOT accurate but costs runs to decide whether to spend runs; ASSUMED always available and honest ONLY because the value is shown in every verdict."
+  }
+}
