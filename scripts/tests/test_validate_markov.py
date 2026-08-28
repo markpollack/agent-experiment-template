@@ -133,3 +133,68 @@ def test_two_samples_of_one_homogeneous_chain_are_called_stationary():
     assert "NON-STATIONARY" not in result["verdict"].upper(), (
         f"one homogeneous chain produced verdict {result['verdict']!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# CT7 — start-state comparability. The half that 0.3.0 does NOT fix.
+#
+# "On the v4 data CT6 changes nothing and CT7 flips the sign." V is a vector; N[0] is expected
+# steps FROM STATES[0]. Reading it as "the" trajectory length assumes every trajectory starts
+# there. These tests are written to FAIL on mismatched start states -- a guard that passes on
+# everything available is theatre.
+# ---------------------------------------------------------------------------
+
+def _traces(start_state: str, n_traces: int, length: int, variant: str) -> pd.DataFrame:
+    rows = []
+    for t in range(n_traces):
+        for k in range(length):
+            rows.append({"variant": variant, "trace_id": f"{variant}-t{t}", "item_id": "item",
+                         "global_seq": k, "semantic_state": start_state if k == 0 else "BUILD"})
+    return pd.DataFrame(rows)
+
+
+def _load_validate_markov():
+    """Import the template's analysis module without running its __main__ path."""
+    import importlib.util, sys, pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root))
+    spec = importlib.util.spec_from_file_location("validate_markov", root / "validate_markov.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["validate_markov"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_start_state_distribution_reports_where_traces_actually_start():
+    vm = _load_validate_markov()
+    dist = vm.start_state_distribution(_traces("READ_KB", 5, 10, "a"))
+    assert dist["READ_KB"] == pytest.approx(1.0)
+
+
+def test_differencing_across_mismatched_start_states_is_refused():
+    """THE CT7 GATE. Two arms starting in different states must not be compared."""
+    vm = _load_validate_markov()
+    a = vm.start_state_distribution(_traces("EXPLORE", 5, 10, "a"))
+    b = vm.start_state_distribution(_traces("READ_KB", 5, 10, "b"))
+    with pytest.raises(AssertionError, match="start-state distributions differ"):
+        vm.refuse_incomparable_start_states({"a": a, "b": b})
+
+
+def test_matched_start_states_are_permitted():
+    """The guard must not simply refuse everything -- that would be its own kind of theatre."""
+    vm = _load_validate_markov()
+    a = vm.start_state_distribution(_traces("EXPLORE", 5, 10, "a"))
+    b = vm.start_state_distribution(_traces("EXPLORE", 5, 12, "b"))
+    vm.refuse_incomparable_start_states({"a": a, "b": b})
+
+
+def test_v_identity_fails_when_v_is_read_from_the_wrong_row():
+    """At unit cost V from the true start state equals mean trajectory length. Here it cannot."""
+    vm = _load_validate_markov()
+    df = _traces("READ_KB", 5, 10, "a")
+    n_states = len(vm.STATES)
+    # A fundamental matrix whose READ_KB row claims far more steps than were observed.
+    N = np.zeros((n_states, n_states))
+    N[vm.STATES.index("READ_KB"), :] = 99.0
+    with pytest.raises(AssertionError, match="mean observed"):
+        vm.assert_v_matches_observed(N, df, "a")

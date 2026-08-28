@@ -72,8 +72,80 @@ def _trace_key_col(classified: pd.DataFrame) -> str:
     return "trace_id" if "trace_id" in classified.columns else "item_id"
 
 
+def start_state_distribution(df: pd.DataFrame, seq_col: str = "global_seq") -> dict[str, float]:
+    """Which state each trajectory actually STARTS in, as a distribution over states.
+
+    CT7. `V` is a vector, and `N[0]` is the expected step count *starting from STATES[0]*. Reading
+    it as "the" trajectory length assumes every trajectory starts there. In both audited
+    experiments they did not, and that -- not the grouping defect -- is what killed two published
+    headlines: on the v4 data it flips the sign.
+    """
+    tkey = _trace_key_col(df)
+    firsts = df.sort_values(seq_col).groupby(tkey)["semantic_state"].first()
+    counts = firsts.value_counts()
+    total = int(counts.sum())
+    return {state: counts[state] / total for state in counts.index} if total else {}
+
+
+def start_state_index(df: pd.DataFrame) -> int:
+    """Row of `N` that `V` must be read from for this data — the state trajectories actually start in.
+
+    `N[0]` is expected steps from STATES[0]. Reading it unconditionally is CT7.
+    """
+    dist = start_state_distribution(df)
+    if not dist:
+        return 0
+    start_state = max(dist, key=dist.get)
+    return STATES.index(start_state) if start_state in STATES else 0
+
+
+def assert_v_matches_observed(N, df: pd.DataFrame, variant: str, tol: float = 0.5) -> None:
+    """The identity that catches CT6 and CT7 together.
+
+    At unit cost, expected steps from the start state must equal the mean observed trajectory
+    length. If it does not, either the trajectories were concatenated (CT6) or `V` is being read
+    from the wrong row (CT7). One line, and it fails loudly rather than producing a plausible
+    number.
+    """
+    dist = start_state_distribution(df)
+    if not dist:
+        return
+    start_index = start_state_index(df)
+    start_state = STATES[start_index]
+    v_at_start = float(N[start_index].sum())
+    tkey = _trace_key_col(df)
+    mean_len = float(df.groupby(tkey).size().mean())
+    if abs(v_at_start - mean_len) >= max(tol, 0.05 * mean_len):
+        raise AssertionError(
+            f"{variant}: V from start state {start_state!r} is {v_at_start:.1f} but mean observed "
+            f"trajectory length is {mean_len:.1f}. At unit cost these are the same number; they are "
+            f"not, so either trajectories were concatenated or V is being read from the wrong row."
+        )
+
+
+def refuse_incomparable_start_states(per_variant: dict[str, dict[str, float]], tol: float = 0.10) -> None:
+    """Do not difference V across variants whose start-state distributions differ.
+
+    The notice's second half, enforced rather than documented -- a rule nothing checks is a
+    suggestion. Compare each arm from its own s0, or do not compare.
+    """
+    variants = sorted(per_variant)
+    for i, a in enumerate(variants):
+        for b in variants[i + 1:]:
+            states = set(per_variant[a]) | set(per_variant[b])
+            drift = {s: abs(per_variant[a].get(s, 0.0) - per_variant[b].get(s, 0.0)) for s in states}
+            worst = max(drift, key=drift.get)
+            if drift[worst] > tol:
+                raise AssertionError(
+                    f"start-state distributions differ between {a!r} and {b!r} "
+                    f"(state {worst!r}: {per_variant[a].get(worst, 0.0):.2f} vs "
+                    f"{per_variant[b].get(worst, 0.0):.2f}). Differencing V across these arms is not "
+                    f"meaningful -- compare each arm from its own s0, or do not compare."
+                )
+
+
 def predicted_vs_actual(classified: pd.DataFrame, items: pd.DataFrame) -> dict:
-    """Compare N[0].sum() to actual classified steps per item.
+    """Compare V from each arm's own start state to actual classified steps per item.
 
     When trace_id is present (multi-run ETL), uses it as item_id_col so each
     run is treated as an independent trace. Runs leave-one-out CV when N≥3.
@@ -82,6 +154,9 @@ def predicted_vs_actual(classified: pd.DataFrame, items: pd.DataFrame) -> dict:
     tkey = _trace_key_col(classified)
     has_multi_run = tkey == "trace_id"
     rows = []
+
+    start_states = {v: start_state_distribution(g) for v, g in classified.groupby("variant")}
+    refuse_incomparable_start_states(start_states)
 
     for variant, vdf in classified.groupby("variant"):
         actual_total = len(vdf)
@@ -112,7 +187,8 @@ def predicted_vs_actual(classified: pd.DataFrame, items: pd.DataFrame) -> dict:
                     item_id_col=tkey,
                 )
                 N_train = compute_fundamental_matrix(Q_train)
-                predicted = float(N_train[0].sum())
+                # CT7: read V from the state these traces actually start in, not row 0.
+                predicted = float(N_train[start_state_index(train_cls)].sum())
                 actual = len(test_cls)
                 cv_errors.append({"held_out": int(held_out), "predicted": round(predicted, 1),
                                    "actual": actual, "delta": round(actual - predicted, 1)})
@@ -139,8 +215,11 @@ def predicted_vs_actual(classified: pd.DataFrame, items: pd.DataFrame) -> dict:
                 item_id_col=tkey,
             )
             N = compute_fundamental_matrix(Q)
-            predicted_per_item = float(N[0].sum())
-            state_predicted = {STATES[j]: float(N[0, j]) for j in range(N_STATES)}
+            assert_v_matches_observed(N, vdf, variant)
+            # CT7: V is a vector. Read the row for the state these traces actually start in.
+            s0 = start_state_index(vdf)
+            predicted_per_item = float(N[s0].sum())
+            state_predicted = {STATES[j]: float(N[s0, j]) for j in range(N_STATES)}
             rows.append({
                 "variant": variant,
                 "n_runs": n_runs,
@@ -277,7 +356,7 @@ def write_report(classified: pd.DataFrame, items: pd.DataFrame,
     # --- Analysis 3 ---
     L.append("## Test 3: Predicted vs Actual\n")
     L.append(
-        "**Question**: How closely does fundamental matrix N[0].sum() predict "
+        "**Question**: How closely does fundamental matrix V from the start state predict "
         "actual classified step count per item?\n"
     )
 
