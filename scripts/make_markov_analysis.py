@@ -56,6 +56,7 @@ Run:
 """
 
 import os
+import re
 
 from pathlib import Path
 import duckdb
@@ -159,6 +160,30 @@ NOTE_MAP = {
 # CUSTOMIZE: Classifier — maps (tool_name, target) → state name
 # ---------------------------------------------------------------------------
 
+_CD_PREFIX = re.compile(r"^\s*cd\s+\S+\s*(?:&&|;)\s*")
+
+DISCOVERY_LABEL_WIDTH = 120
+
+
+def _discovery_label(target: str) -> str:
+    """Normalise a tool target into a groupable discovery label.
+
+    Strips leading `cd <path> &&` chains so the operative verb leads, then clips to a
+    width wide enough to retain arguments. Clustering needs a shared prefix; the verb is
+    what makes two calls the same kind of work, and a path is what makes them differ.
+    """
+    if not target:
+        return ""
+    text = target
+    for _ in range(3):  # `cd a && cd b && cmd` occurs
+        stripped = _CD_PREFIX.sub("", text)
+        if stripped == text:
+            break
+        text = stripped
+    text = " ".join(text.split())
+    return text[:DISCOVERY_LABEL_WIDTH]
+
+
 def classify_state(tool_name: str, target: str) -> str | None:
     """
     Map a tool call to a semantic state name.
@@ -177,9 +202,24 @@ def classify_state(tool_name: str, target: str) -> str | None:
     tool_lower = tool_name.lower() if tool_name else ""
     target_lower = target.lower() if target else ""
 
-    # Discovery mode: return raw label for frequency inspection
+    # Discovery mode: return a label for frequency inspection.
+    #
+    # This label is CLUSTERED BY VALUE to show frequencies, so it cannot be fully
+    # lossless -- a unique 60KB command per row would produce no clusters at all and
+    # discovery would show nothing. What it must never do is truncate away the token
+    # that identifies the work.
+    #
+    # The 2026-08-29 defect: a bare target[:40] on an agent that runs
+    #   cd /tmp/experiment-workspace-9459141672056416598/spring-batch/... && grep -rn X
+    # shows only the `cd` and the path. The verb -- grep, cat, mvn -- sits past the
+    # window, so every such call collapses to one indistinguishable label. Phase 0 is
+    # where states are NAMED, so a taxonomy discovered from that output is wrong at its
+    # source and every later analysis inherits it.
+    #
+    # Fix: normalise first, truncate second. Strip leading `cd <path> &&` chains so the
+    # operative verb leads, then take a window wide enough to keep arguments.
     if DISCOVERY_MODE:
-        return f"{tool_name}:{target[:40]}"
+        return f"{tool_name}:{_discovery_label(target)}"
 
     # Exclude meta-tools (task management, agent coordination)
     if tool_lower in ("todowrite", "todoread", "task", "taskupdate", "taskcreate",
